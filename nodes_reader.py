@@ -1,4 +1,8 @@
 #!/usr/bin/python3
+
+from packaging import version
+import web3
+
 import configparser
 import os
 from web3 import Web3
@@ -16,7 +20,10 @@ indexFile = config['DEFAULT']['IndexFile']
 nodesFile = config['DEFAULT']['CSVFile']
 
 w3 = Web3(Web3.HTTPProvider(httpProvider))
-w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+if version.parse(web3.__version__) < version.parse('5.0.0'):
+    w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+else:
+    w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
 
 def read_contract_abi():
