@@ -34,7 +34,7 @@ Subsequent runs will run much faster by looking at the differences.
 
 *nodes.csv* - Output of the script with the details of the nodes interacting with the smart contract <br />
 
-*nodes.csv column details* <br />
+*nodes.csv* - Column details <br />
 
 | Column 01  | Column 02 | Column 03 | Column 04 | Column 05 | Column 06 | Column 07 | Column 08 | Column 09 | Column 10 |Column 11|
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
