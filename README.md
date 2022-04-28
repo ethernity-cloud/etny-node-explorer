@@ -12,10 +12,10 @@ pip install web3 <br />
 git clone https://github.com/ethernity-cloud/etny-node-explorer <br />
 
 ### Running
-Launch the script with "python3 nodes_reader.py".  <br />
+Launch it with "python3 nodes_reader.py".  <br />
 The script works by scanning the blockchain for nodes which interacts with the smart contract and saves the output to a CSV file. <br />
-When ran for the first time the script creates an local index by scanning the blockchain. This takes a *long* time, usually about 5 hours.  <br />
-Subsequent runs will run much faster by looking at the differences.
+When ran for the first time the script creates a local index by scanning the blockchain. This takes a *long* time, usually about 5 hours.  <br />
+Subsequent runs will complete much faster by only looking at the differences.
 
 ### File Details
 *config.env* - Environment config such as blockchain provider, smart contract address, index file and output file <br />
