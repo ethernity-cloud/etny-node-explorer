@@ -38,7 +38,7 @@ Subsequent runs will run much faster by looking at the differences.
 
 | Column 01  | Column 02 | Column 03 | Column 04 | Column 05 | Column 06 | Column 07 | Column 08 | Column 09 | Column 10 |Column 11|
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|id|wallet address|CPU*|RAM|Storage|Bandwith|Task*|Status*|Cost*|Created*|Last updated*|
+|id|wallet address|CPU*|RAM|Storage|Bandwith   |Task*|Status*|Cost*|Created*|Last updated*|
 
 
 _*CPU_ = CPU Number of Cores <br />
