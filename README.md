@@ -9,8 +9,10 @@ web3 module >=4.0 (Find out which is installed by running ```pip show web3```) <
 ### Ubuntu Instructions
 Below commands are installing the prerequsites and clone the repository
 ```
-sudo apt install python3 pip -y
-pip install web3
+sudo apt update
+sudo apt upgrade -y
+sudo apt install python3 pip3 python3-package -y
+pip3 install web3
 git clone https://github.com/ethernity-cloud/etny-node-explorer
 ```
 
