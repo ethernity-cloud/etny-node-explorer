@@ -11,7 +11,7 @@ Below commands are installing the prerequsites and clone the repository
 ```
 sudo apt update
 sudo apt upgrade -y
-sudo apt install python3 pip3 python3-package -y
+sudo apt install python3 pip3 python3-packaging -y
 pip3 install web3
 git clone https://github.com/ethernity-cloud/etny-node-explorer
 ```
