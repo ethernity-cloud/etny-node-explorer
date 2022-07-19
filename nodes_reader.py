@@ -90,6 +90,7 @@ for i in range(startBlockNumber, currentBlock, 10):
 with open(indexFile, 'w') as convert_file:
     convert_file.write(json.dumps(values))
 
+values = read_index_content()
 nodes = read_csv_file(nodesFile)
 
 startingCount = 0
