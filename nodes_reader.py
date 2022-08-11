@@ -22,23 +22,24 @@ class Reader:
     _contract = None
     _indexFile = None
     _nodesFile = None
+    _httpProvider = None
 
     def __init__(self) -> None:
         self._baseConfig()
-
-
+        
         self._action()
+
 
     def _baseConfig(self) -> None:
         config = configparser.ConfigParser()
         config.read('config.env')
-        httpProvider = config['DEFAULT']['HttpProvider']
+        self._httpProvider = config['DEFAULT']['HttpProvider']
 
         self._contract = config['DEFAULT']['ContractAddress']
         self._indexFile = config['DEFAULT']['IndexFile']
         self._nodesFile = config['DEFAULT']['CSVFile']
 
-        self._w3 = Web3(Web3.HTTPProvider(httpProvider))
+        self._w3 = Web3(Web3.HTTPProvider(self._httpProvider))
         if version.parse(web3.__version__) < version.parse('5.0.0'):
             self._w3.middleware_stack.inject(geth_poa_middleware, layer=0)
         else:
@@ -65,18 +66,17 @@ class Reader:
         for i in range(startBlockNumber, currentBlock, 10):
             currentCounter = etnyContract.functions._getDPRequestsCount().call(block_identifier=i)
             if currentCounter not in values:
+                print('not in -----')
                 values[currentCounter] = i
                 if currentCounter % 10 == 0:
-                    with open(self._indexFile, 'w') as convert_file:
-                        convert_file.write(json.dumps(values))
-            print('reading block: ', i)
+                    self.__write_index_content(values)
+            print('reading block: ', i, currentCounter)
 
         # write json back
         self.__write_index_content(values)
 
         # get json again
         values = self.__read_index_content()
-
 
         nodes = self.__read_csv_file(self._nodesFile)
 
@@ -103,9 +103,7 @@ class Reader:
             with open(self._nodesFile, 'w',newline='') as output_file:
                 writer = csv.writer(output_file, dialect="excel-tab")
                 for k, row in nodes.items():
-                    writer.writerow(
-                        [row.no, row.address, row.cpu, row.memory, row.storage, row.bandwith, row.duration, row.status,
-                        row.cost, row.created_on, row.last_updated])
+                    writer.writerow([row.no, row.address, row.cpu, row.memory, row.storage, row.bandwith, row.duration, row.status, row.cost, row.created_on, row.last_updated])
 
     def __read_contract_abi(self) -> str:
         try:
@@ -117,7 +115,7 @@ class Reader:
     def __read_index_content(self) -> dict:
         if os.path.exists(self._indexFile):
             with open(self._indexFile) as r:
-                return json.loads(r)
+                return json.load(r)
         return {}
 
     def __write_index_content(self, jsonContent) -> dict:
