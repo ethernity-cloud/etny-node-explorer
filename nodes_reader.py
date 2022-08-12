@@ -10,8 +10,12 @@ from multiprocessing import Process, cpu_count
 from helpers.exceptions import NotFoundException
 
 
-from helpers.sqlite_database import SqliteDatabase as Database, dbException
-# from helpers.mysql_database import MysqlDatabase as Database
+try:
+    from helpers.mysql_database import MysqlDatabase as Database, dbException
+    #import non_existing_module_to_trigger_import_error
+except ImportError as e:
+    from helpers.sqlite_database import SqliteDatabase as Database, dbException
+
 
 # config section
 
@@ -34,20 +38,14 @@ class Reader:
         if self.is_child:
             self._childProcess()
         else:
-            #Database().dropTable()
 
+            # Database().dropTable()
             # init database
             Database().init()
 
-            Database().insert(_id =234234234, order_id=111)
-
-            Database().commit()
-
-            Database().count()
-
             # init database
 
-            # self._parentProcess()
+            self._parentProcess()
 
         # self._action()
 
@@ -255,6 +253,12 @@ class fork_process(Reader):
         try:
             Database().insert(_id = currentCounter, order_id=i)
         except dbException as e:
+            print('---' * 10)
+            print('---' * 10)
+            print(e)
+            print('---' * 10)
+            print('---' * 10)
+            print('---' * 10)
             time.sleep(.01)
             self.insert(etnyContract=etnyContract, i=i)
         return currentCounter
