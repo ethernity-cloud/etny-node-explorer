@@ -1,25 +1,25 @@
 #!/usr/bin/python3
 
-from ast import parse
-import web3, configparser, argparse, os, asyncio, json, csv, time
+from urllib import request
+import web3, argparse, sys, os, asyncio, json, csv, time
 from packaging import version
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from node import Node
 from multiprocessing import Process, cpu_count
-from helpers.exceptions import NotFoundException
-
+from helpers.exceptions import NotFoundException, DatabaseEngineNotFoundError
+import helpers.config as config
+from requests.exceptions import ConnectionError
 
 try:
+    if config.config['DATABASE']['engine'] != 'MYSQL':
+        raise DatabaseEngineNotFoundError('For DB Engine is used Sqlite')
     from helpers.mysql_database import MysqlDatabase as Database, dbException
-    #import non_existing_module_to_trigger_import_error
-except ImportError as e:
+except (ImportError, DatabaseEngineNotFoundError) as e:
+    print(e)
     from helpers.sqlite_database import SqliteDatabase as Database, dbException
 
-
 # config section
-
-BASE_LOOP_ITER = 1000 
 
 class Reader:
 
@@ -45,19 +45,17 @@ class Reader:
 
             # init database
 
-            self._parentProcess()
+            self._parentProcess(is_inline_process=True)
+            #self._parentProcess()
 
         # self._action()
 
 
     def _baseConfig(self) -> None:
-        config = configparser.ConfigParser()
-        config.read('config.env')
-        self._httpProvider = config['DEFAULT']['HttpProvider']
-
-        self._contract = config['DEFAULT']['ContractAddress']
-        self._indexFile = config['DEFAULT']['IndexFile']
-        self._nodesFile = config['DEFAULT']['CSVFile']
+        self._httpProvider = config.config['DEFAULT']['HttpProvider']
+        self._contract = config.config['DEFAULT']['ContractAddress']
+        self._indexFile = config.config['DEFAULT']['IndexFile']
+        self._nodesFile = config.config['DEFAULT']['CSVFile']
 
         self._w3 = Web3(Web3.HTTPProvider(self._httpProvider))
         if version.parse(web3.__version__) < version.parse('5.0.0'):
@@ -65,36 +63,39 @@ class Reader:
         else:
             self._w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
-    def _childProcess(self) -> None:
+    def _childProcess(self, block_identifier = None) -> None:
+        if block_identifier:
+            self.block_identifier = block_identifier
         print('----------block identifier = ', self.block_identifier)
         fork_process(block_identifier = self.block_identifier)
 
     def _async_run(self, i):
         asyncio.run(self.action(cmd = f'python3 nodes_reader.py -c True -b {i}'))
 
-    def _parentProcess(self):
+    def _parentProcess(self, is_inline_process = True):
         [
-            etnyContract,
             currentBlock,
-            startBlockNumber,
-            values
+            startBlockNumber
         ] = self._action_args()
 
-
         threads = []
-        for i in range(startBlockNumber, currentBlock, BASE_LOOP_ITER):
-            t = Process(target = self._async_run, args = (i, ))
+        _iter = 0
+        print(startBlockNumber, currentBlock, config.BASE_LOOP_ITER)
+        for i in range(startBlockNumber, currentBlock, config.BASE_LOOP_ITER):
+            methodName = self._async_run if not is_inline_process else self._childProcess
+            print('len = ', len(threads))
+            t = Process(target = methodName, args = (i, ))
+            t.daemon = True
             t.start()
             threads.append(t)
-            if len(threads) > int(cpu_count() * 3):
+            if len(threads) > int(cpu_count() * 5):
+                print('*', cpu_count(), i, len(threads))
                 for thread in threads:
                     thread.join()
                 threads = []
-
-            print('---------------', i, len(threads))
-
-            if i > startBlockNumber + int(BASE_LOOP_ITER * 10):break
-
+            _iter += 1
+            if _iter > 300:break
+        print('iter = ', _iter)
 
     async def action(self, cmd = ''):
         inlineProc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, shell=True, preexec_fn=os.setsid)
@@ -105,27 +106,32 @@ class Reader:
 
     def _action(self):
         [
-            etnyContract,
             currentBlock,
             startBlockNumber,
-            values
         ] = self._action_args()
 
-        for i in range(startBlockNumber, currentBlock, 10):
+        etnyContract = self._get_etnyContract()
+        
+        previous_counter = None
+        for order_id in range(startBlockNumber, currentBlock, 10):
             currentCounter = etnyContract.functions._getDPRequestsCount().call(block_identifier=i)
-            if currentCounter not in values:
-                print('not in d -----')
-                values[currentCounter] = i
-                if currentCounter % 10 == 0:
-                    self.__write_index_content(values)
-            print('reading block: ', i, currentCounter)
+            if currentCounter != previous_counter:
+                if_exists = Database().select_one(single = 'id, order_id', id = currentCounter)
+                [print('*-*-*' * 10) for x in range(5)]
+                print(if_exists)
+                [print('*-*-*' * 10) for x in range(5)]
+                if if_exists and if_exists[1] > order_id:
+                    print('is updated------------')
+                    Database().update(fields = {'order_id': order_id}, where = {'id': currentCounter}).commit()
+                else:
+                    previous_counter = currentCounter
+                    Database().insert(_id = currentCounter, order_id=order_id)
+                    if currentCounter % 10 == 0:
+                        Database().commit()
+            print('reading block: ', order_id, currentCounter)
             if i > startBlockNumber + 1000:break
 
-        # write json back
-        self.__write_index_content(values)
-
-        # get json again
-        values = self.__read_index_content()
+        Database().commit()
 
         nodes = self.__read_csv_file(self._nodesFile)
 
@@ -142,11 +148,11 @@ class Reader:
             if request[0] not in nodes:
                 node = Node(node_index, request[0], request[1], request[2], request[3], request[4], request[5], request[6],
                             request[7],
-                            self.__get_timestamp_from_request(values, i), self.__get_timestamp_from_request(values, i))
+                            self.__get_timestamp_from_request(i), self.__get_timestamp_from_request(i))
                 nodes[request[0]] = node
                 node_index = node_index + 1
             else:
-                nodes[request[0]].last_updated = self.__get_timestamp_from_request(values, i)
+                nodes[request[0]].last_updated = self.__get_timestamp_from_request(i)
 
         if len(nodes) > 0:
             with open(self._nodesFile, 'w',newline='') as output_file:
@@ -154,31 +160,39 @@ class Reader:
                 for k, row in nodes.items():
                     writer.writerow([row.no, row.address, row.cpu, row.memory, row.storage, row.bandwith, row.duration, row.status, row.cost, row.created_on, row.last_updated])
 
+    def _get_etnyContract(self):
+        return self._w3.eth.contract(address=self._contract, abi=self.__read_contract_abi())
+
     def _action_args(self):
-        etnyContract = self._w3.eth.contract(address=self._contract, abi=self.__read_contract_abi())
-        firstContractTx = "0x90eeb0a0680034c8c340dfa60b773ed77b060d6a966596059610981486d312f4"
+        try:
+            firstContractTx = "0x90eeb0a0680034c8c340dfa60b773ed77b060d6a966596059610981486d312f4"
 
-        blockNumber = self._w3.eth.getTransaction(firstContractTx).blockNumber
-        timestamp = self._w3.eth.getBlock(blockNumber).timestamp
-        currentBlock = self._w3.eth.blockNumber
+            blockNumber = self._w3.eth.getTransaction(firstContractTx).blockNumber
+            timestamp = self._w3.eth.getBlock(blockNumber).timestamp
+            currentBlock = self._w3.eth.blockNumber
 
-        if not self.is_child:
-            print("Connected...")
-            print('block number', blockNumber)
-            print('timestamp', timestamp)
-            print('current block number', currentBlock)
+            if not self.is_child:
+                print("Connected...")
+                print('block number', blockNumber)
+                print('timestamp', timestamp)
+                print('current block number', currentBlock)
 
-        values = self.__read_index_content()
-        startBlockNumber = blockNumber + 10
-        if len(values.keys()) > 0:
-            startBlockNumber = values[max(values, key=values.get)]
+            startBlockNumber = blockNumber + 10
+            max_node = Database().select_one(single = 'max(id) as id, order_id')
+            if max_node:
+                if not self.is_child:
+                    print('max node = ', max_node)
+                    
+                startBlockNumber = max_node[1]
 
-        return [
-            etnyContract,
-            currentBlock,
-            startBlockNumber,
-            values
-        ]
+            return [
+                currentBlock,
+                startBlockNumber
+            ]
+        except (dbException, TypeError) as e:
+            print('-----', e)
+            time.sleep(0.01)
+            return self._action_args()
 
     def __read_contract_abi(self) -> str:
         try:
@@ -212,56 +226,76 @@ class Reader:
         finally:
             return rows
 
-    def __get_timestamp_from_request(self, values, request_id):
-        while str(request_id) not in values.keys():
+    def __get_timestamp_from_request(self, request_id):
+        # while str(request_id) not in values.keys():
+        while Database().select_one(singe = 'id', id = request_id):
             request_id = request_id - 1
 
-        block_number = values[str(request_id)]
+        # block_number = values[str(request_id)]
+        block_number = Database().select_one(single = 'order_id', id = request_id)
         time_stamp = self._w3.eth.getBlock(block_number).timestamp
 
         return time_stamp
 
 
 class fork_process(Reader):
+    previous_counters = set()
+    etnyContract = None
     def __init__(self, block_identifier = None) -> None:
         self.block_identifier = int(block_identifier)
 
         self.is_child = False
         self._baseConfig()
+        self.etnyContract = self._get_etnyContract()
 
         self.init()
 
     def init(self):
-        [
-            etnyContract,
-            currentBlock,
-            startBlockNumber,
-            values
-        ] = self._action_args()
 
         itr = 0
-        for i in range(self.block_identifier, self.block_identifier + BASE_LOOP_ITER, int(BASE_LOOP_ITER / 100)):
-            currentCounter = self.insert(etnyContract=etnyContract, i=i)
-            if itr >= 100:
+        commit_limit = 100
+        for order_id in range(self.block_identifier, self.block_identifier + config.BASE_LOOP_ITER, int(config.BASE_LOOP_ITER / 100)):
+            currentCounter = self.insert(order_id=order_id)
+            itr += 1
+            if itr >= commit_limit:
                 Database().commit()
                 itr = 0
-            itr += 1
-            print('something here:d ', currentCounter,  i, self.block_identifier)
+        print('debug: ', itr, currentCounter,  order_id, self.block_identifier)
 
-    def insert(self, etnyContract, i):
-        currentCounter = etnyContract.functions._getDPRequestsCount().call(block_identifier=i)
+        if itr and itr < commit_limit:
+            Database().commit()
+
+
+    def insert(self, order_id, recursive_count = 0):
         try:
-            Database().insert(_id = currentCounter, order_id=i)
-        except dbException as e:
-            print('---' * 10)
-            print('---' * 10)
-            print(e)
-            print('---' * 10)
-            print('---' * 10)
-            print('---' * 10)
-            time.sleep(.01)
-            self.insert(etnyContract=etnyContract, i=i)
-        return currentCounter
+            currentCounter = self.etnyContract.functions._getDPRequestsCount().call(block_identifier=order_id)
+            try:
+                if currentCounter not in self.previous_counters:
+                    if len(self.previous_counters) > 10:
+                        self.previous_counters = set()
+                    self.previous_counters.add(currentCounter)
+                    if_exists = Database().select_one(single = 'id, order_id', id = currentCounter)
+                    print(if_exists, order_id)
+                    if not if_exists:
+                        Database().insert(_id = currentCounter, order_id=order_id)
+                    elif if_exists and if_exists[1] > order_id:
+                        print('is updated------------')
+                        Database().update(fields = {'order_id': order_id}, where = {'id': currentCounter}).commit()
+                    
+            except dbException as e:
+                [print('--*' * 1) for x in range(10)]
+                print(e)
+                [print('**-' * 1) for x in range(10)]
+                time.sleep(.01)
+                self.insert(order_id=order_id)
+            return currentCounter
+        except ConnectionError as e:
+            print('*|* - ', order_id, e)
+            if recursive_count and recursive_count % 10 == 0:
+                time.sleep(0.01)
+            self._baseConfig()
+            self.etnyContract = self._get_etnyContract()
+            return self.insert(order_id = order_id, recursive_count=recursive_count + 1)
 
 
 if __name__ == '__main__':

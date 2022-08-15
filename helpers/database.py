@@ -25,18 +25,50 @@ class Database:
 
 
     def insert(self, _id, order_id, ) -> None:
-        self._curr.execute(f'''
-            insert into {self.TABLE_NAME} 
-                (id, order_id, ins_time) values 
-                ({_id}, {order_id}, {int(time.time())})
-            ''')
+        query = f'''insert into {self.TABLE_NAME} 
+                        (id, order_id, ins_time) values 
+                    ({_id}, {order_id}, {int(time.time())})'''
+        self._curr.execute(query)
 
-    def count(self):
-        try:
-            self._curr.execute(f"select count(*) from {self.TABLE_NAME}")
-            print(self._curr.fetchone()[0])
-        except Exception as e:
-            print(e)
+    def update(self, *args, **kwargs):
+        fields = self.extract_args(kwargs['fields'])
+        where = self.extract_args(kwargs['where'])
+        query = f'''
+            update {self.TABLE_NAME}
+                set {fields}
+                where {where}
+        '''
+        self._curr.execute(query)
+        return self    
+
+    def __getattr__(self, methodName):
+        def wrapper(*args, **kwargs):
+            if methodName in ['select_one', 'select_all', 'count']:
+                is_single = 'single' in kwargs.keys()
+                if is_single:
+                    fields = kwargs['single']
+                else:
+                    fields = "count(*)" if methodName == 'count' else "*"
+
+                query = f'''select {fields} from {self.TABLE_NAME}'''
+                if [key for key in kwargs.keys() if key not in ['single']]:
+                    arguments = [f"{x} = {y}" for x, y in kwargs.items() if x not in ['single']]
+                    query += f''' where {(" and ".join(arguments))}'''
+
+                print(query)
+                self._curr.execute(query)
+                if methodName in ['select_all']:             
+                    result = self._curr.fetchall()
+                    if is_single:
+                        return (x[0] for x in result) # generator
+                    return (x for x in result) # generator
+                result = self._curr.fetchone()
+                return [] if not result else (result[0] if is_single and result and ',' not in kwargs['single'] else [x for x in result if x])
+        return wrapper
+
+
+    def extract_args(self, items):
+        return ",".join([f"{x} = {y}" if type(y) != str else f"{x} = '{y}'" for x, y in items.items()])
 
     def __del__(self):
         try:

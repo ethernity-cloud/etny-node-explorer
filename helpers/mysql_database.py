@@ -1,6 +1,7 @@
 import os, sys, pymysql, configparser
 from helpers.singleton import Singleton
 from helpers.database import Database
+from pymysql.err import IntegrityError as dbException
 
 class MysqlDatabase(Database, metaclass = Singleton):
 
@@ -39,4 +40,11 @@ class MysqlDatabase(Database, metaclass = Singleton):
             super().insert(_id = _id, order_id=order_id)
         except pymysql.err.IntegrityError as e:
             pass
+
+    def commit(self) -> None:
+        try:
+            return super().commit()
+        except dbException as e:
+            print(e)
+
 

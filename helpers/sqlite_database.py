@@ -31,6 +31,12 @@ class SqliteDatabase(Database, metaclass = Singleton):
         for row in self._curr.execute(f"select * from {self.TABLE_NAME}"):
             print(row)
 
+    def commit(self) -> None:
+        try:
+            return super().commit()
+        except dbException as e:
+            print(e)
+
     
 
 
