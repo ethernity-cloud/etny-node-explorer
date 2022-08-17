@@ -1,6 +1,7 @@
 
 import time
 
+
 class dbException(Exception):
     pass
 
@@ -21,24 +22,38 @@ class Database:
         self._conn.commit()
 
     def dropTable(self):
+        try:
+            self._curr.execute("set foreign_key_checks = 0;")
+        except:pass
         self._curr.execute(f"drop table if exists {self.TABLE_NAME}")
+        self._curr.execute(f"drop table if exists {self.TABLE_NAME}_details")
 
 
-    def insert(self, _id, order_id, ) -> None:
-        query = f'''insert into {self.TABLE_NAME} 
-                        (id, order_id, ins_time) values 
-                    ({_id}, {order_id}, {int(time.time())})'''
+    def insert(self, node = None) -> None:
+        public = node.public()
+        private = node.private()
+        # root
+        with self._curr:
+            query = f'''insert into {self.TABLE_NAME} set {self.extract_args({**private, 'created_on': int(time.time())})}'''
+            self._curr.execute(query)
+            insert_id = self._curr.lastrowid
+            # child
+            sub_query = f'''insert into {self.TABLE_NAME}_details set {self.extract_args({**public, 'parent_id': insert_id})}'''
+            print(query)
+            print(sub_query)
+            self._curr.execute(sub_query)
+
+    def update(self, node):
+        public = node.public()
+        private = node.private()
+        query = f'''update {self.TABLE_NAME} set 
+                        {self.extract_args({x: y for x, y in private.items() if x not in ['id']})}, last_updated = {int(time.time())}, updates_count = updates_count + 1
+                    where id = {node.id}'''
+        sub_query = f'''update {self.TABLE_NAME}_details set 
+                            {self.extract_args({**public})}
+                        where parent_id = {node.id}'''
         self._curr.execute(query)
-
-    def update(self, *args, **kwargs):
-        fields = self.extract_args(kwargs['fields'])
-        where = self.extract_args(kwargs['where'])
-        query = f'''
-            update {self.TABLE_NAME}
-                set {fields}
-                where {where}
-        '''
-        self._curr.execute(query)
+        self._curr.execute(sub_query)
         return self    
 
     def __getattr__(self, methodName):
@@ -55,7 +70,7 @@ class Database:
                     arguments = [f"{x} = {y}" for x, y in kwargs.items() if x not in ['single']]
                     query += f''' where {(" and ".join(arguments))}'''
 
-                print(query)
+                # print(query)
                 self._curr.execute(query)
                 if methodName in ['select_all']:             
                     result = self._curr.fetchall()
