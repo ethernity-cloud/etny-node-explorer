@@ -48,7 +48,8 @@ class SqliteDatabase(Database, metaclass = Singleton):
             
             self._curr.execute(query)
             insert_id = self._curr.lastrowid
-            print('-------insert id = ', insert_id)
+            if not insert_id:
+                raise Exception('insert id not found...')
             # child
             query = f'''insert into {self.TABLE_NAME}_details ({",".join(public.keys())}, parent_id) 
                             values 
@@ -56,6 +57,12 @@ class SqliteDatabase(Database, metaclass = Singleton):
             return self._curr.execute(query)
         except sqlite3.IntegrityError as e:
             pass
+        except (self._conn.Error, Exception) as e:
+            print(e)
+            time.sleep(.2)
+            return self.insert(node=node)
+        finally:
+            self._conn.commit()
 
     def select(self):
         for row in self._curr.execute(f"select * from {self.TABLE_NAME}"):

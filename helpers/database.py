@@ -9,7 +9,9 @@ class Database:
     TABLE_NAME = 'orders'
     _conn, _curr = None, None
 
-    def __init__(self) -> None:
+    dict_cursor = False
+    def __init__(self, dict_cursor = False) -> None:
+        self.dict_cursor = dict_cursor
         self.connect()
 
     def connect(self) -> None:
@@ -30,18 +32,7 @@ class Database:
 
 
     def insert(self, node = None) -> None:
-        public = node.public()
-        private = node.private()
-        # root
-        with self._curr:
-            query = f'''insert into {self.TABLE_NAME} set {self.extract_args({**private, 'created_on': int(time.time())})}'''
-            self._curr.execute(query)
-            insert_id = self._curr.lastrowid
-            # child
-            sub_query = f'''insert into {self.TABLE_NAME}_details set {self.extract_args({**public, 'parent_id': insert_id})}'''
-            print(query)
-            print(sub_query)
-            self._curr.execute(sub_query)
+        pass
 
     def update(self, node):
         public = node.public()
@@ -81,6 +72,29 @@ class Database:
                 return [] if not result else (result[0] if is_single and result and ',' not in kwargs['single'] else [x for x in result if x])
         return wrapper
 
+    def get_missing_items(self):
+        query = f'''
+            select 
+                o.id, o.order_id
+            from {self.TABLE_NAME} o
+            where not exists (select id from {self.TABLE_NAME}_details where parent_id = o.id)
+        '''
+        query = self._curr.execute(query)
+        return self._curr.fetchall()
+
+
+    def select_all(self):
+        query = f'''
+            select 
+                o.*,
+                r.*
+            from {self.TABLE_NAME} o
+            join {self.TABLE_NAME}_details r on r.parent_id = o.id
+            limit 10
+        '''
+        self._curr.execute(query)
+        result = self._curr.fetchall()
+        return (x for x in result)
 
     def extract_args(self, items):
         return ",".join([f"{x} = {y}" if type(y) != str else f"{x} = '{y}'" for x, y in items.items()])

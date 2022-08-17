@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
 import multiprocessing
+from pickle import FALSE
 from platform import node
-from urllib import request
 import web3, argparse, sys, os, asyncio, json, csv, time
 from packaging import version
 from web3 import Web3
@@ -10,8 +10,9 @@ from web3.middleware import geth_poa_middleware
 from node import Node
 from multiprocessing import Process, cpu_count, Manager
 from helpers.exceptions import NotFoundException, DatabaseEngineNotFoundError, BreackFromLoopException
-import helpers.config as config    
+import helpers.config as config
 from helpers.terminated_task import TerminatedTask
+from typing import Union
 
 from requests.exceptions import ConnectionError
 
@@ -41,11 +42,17 @@ class sharedObject(object):
                 self.val = []
             if value not in self.val:
                 self.val.append(value)
+    
+    def reset(self):
+        with self.lock:
+            self.val = []
+
     @property
     def value(self):
         with self.lock:
             return self.val
 
+GLOBAL_LOCK = multiprocessing.Lock()
 
 class Reader:
 
@@ -66,34 +73,13 @@ class Reader:
             else:
 
                 # Database().dropTable()
-                Database().init()
-
-                # n = Node(
-                #     id = 1,
-                #     order_id = 2,
-                #     address = '0x02B143Fe76f4F8C4A2E792311664d24759c49d52', 
-                #     cpu = 1, 
-                #     memory = 1, 
-                #     storage = 40, 
-                #     bandwith = 1, 
-                #     duration = 60, 
-                #     status = 0, 
-                #     cost = 2
-                # )
-
-                # print(n.public())
-                # print(n.private())
-
-                # Database().insert(node = n)
-                # Database().update(node = n)
-                # Database().commit()
-                # sys.exit()
 
                 # init database
-
+                Database().init()
+                
                 # [self._log(f"{str(getattr(config.bcolors, x)).split('.')[1]} - something", str(getattr(config.bcolors, x)).split('.')[1]) for x in dir(config.bcolors) if not x.startswith('__')]
 
-                asyncio.run(self._parentProcess(is_inline_process=True))
+                asyncio.run(self._parentProcess(is_inline_process=FALSE))
         except KeyboardInterrupt as e:
             for process in multiprocessing.active_children():
                 process.terminate()  
@@ -137,6 +123,24 @@ class Reader:
             p.join()
         print("join all child; left childrend count = {0}".format(len(multiprocessing.active_children())))
 
+    def getNode(self, currentCounter, insert_id, order_id) -> Node | None:
+        request = self.etnyContract.functions._getDPRequest(currentCounter).call()
+        if not request:
+            self._log("there no request at all ------", "error")
+            return None
+            
+        node = Node(
+            id = insert_id,
+            order_id = order_id
+        )
+        items = ['address', 'cpu', 'memory', 'storage', 'bandwith', 'duration', 'status', 'cost']
+        for key, item in enumerate(items):
+            try:
+                setattr(node, item, request[key])
+            except IndexError as e:
+                pass
+        return node
+
     async def _parentProcess(self, is_inline_process = True):
         [
             startBlockNumber,
@@ -151,24 +155,31 @@ class Reader:
         for i in range(startBlockNumber, currentBlock, config.BASE_LOOP_ITER):
             active_childrens_count = len(multiprocessing.active_children())
             if active_childrens_count > LIMIT_OF_THREADS:
-                print('----------wait for threads: ', active_childrens_count)
                 time.sleep(.5)
                 continue
 
             methodName = self._async_run if not is_inline_process else self._childProcess
-            self._log(f'len =  {active_childrens_count}', 'info')
+            self._log(f'len =  {active_childrens_count}, iter = {_iter}', 'info')
             thread = Process(target = methodName, args = (i, shared_object))
             # thread.daemon = True
             thread.start()
 
             # terminate on demand
             if is_inline_process:
-                self._log(f'---progress: {thread.pid}', 'info')
+                # self._log(f'---progress: {thread.pid}', 'info')
                 asyncio.create_task(self.until_finished(thread, i))
             # terminate on demand
 
             _iter += 1
-            # if _iter > 300:break
+            if _iter and _iter % 200 == 0:
+                self._log('need to join threads...')
+                # shared_object = sharedObject(initval=[])
+                if is_inline_process:
+                    shared_object.reset()
+                self.joinAll()
+                
+
+
         self._log(f'iter =  {_iter}')
 
     async def action(self, cmd = ''):
@@ -182,6 +193,7 @@ class Reader:
         t = time.time()
         while True:
             try:
+                self._log('please register this text somehow ----', 'error')
                 if not thread.is_alive():
                     raise BreackFromLoopException('force')
                 if int(time.time() - t) >= TASK_LIFE_TIME:
@@ -313,18 +325,10 @@ class fork_process(Reader):
     def init(self):
 
         itr = 0
-        commit_limit = 100
         for order_id in range(self.block_identifier, self.block_identifier + config.BASE_LOOP_ITER, int(config.BASE_LOOP_ITER / 100)):
             currentCounter = self.insert(order_id=order_id)
             itr += 1
-            if itr >= commit_limit:
-                Database().commit()
-                itr = 0
-        self._log(f'debug: {itr}, {currentCounter},  {order_id}, {self.block_identifier}', 'message')
-
-        if itr and itr < commit_limit:
-            Database().commit()
-
+        self._log(f'debug: {itr}, {order_id}, {self.block_identifier}', 'message')
 
     def insert(self, order_id, recursive_count = 0):
         try:
@@ -340,40 +344,33 @@ class fork_process(Reader):
 
                 # shared buffer
                 if self.shared_object:
-                    if int(currentCounter) in self.shared_object.value and not recursive_count:return
-                    self.shared_object.append(currentCounter)
-                    print('shared object = ', currentCounter, self.shared_object.value, recursive_count, os.getpid())
+                    try:
+                        if int(currentCounter) in self.shared_object.value and not recursive_count:return
+                        self.shared_object.append(currentCounter)
+                        print('shared object = ', currentCounter, self.shared_object.value, recursive_count, os.getpid())
+                    except ConnectionRefusedError as c:
+                        print('----------connection refused...')
 
                 if_exists = Database().select_one(single = 'id, order_id', id = insert_id)
                 if not if_exists or (if_exists and if_exists[1] > order_id):
+                    node = self.getNode(currentCounter, insert_id, order_id)
+                    if not node:return
+                    with GLOBAL_LOCK:
+                        if not if_exists:
+                            Database().insert(node)
+                            # print('after inserting: ', node.instance())
 
-                    request = self.etnyContract.functions._getDPRequest(currentCounter).call()
-                    node = Node(
-                        id = insert_id,
-                        order_id = order_id
-                    )
-                    items = ['address', 'cpu', 'memory', 'storage', 'bandwith', 'duration', 'status', 'cost']
-                    for key, item in enumerate(items):
-                        try:
-                            setattr(node, item, request[key])
-                        except IndexError as e:
-                            pass
-                        
-                    if not if_exists:
-                        Database().insert(node)
-                        print('after inserting: ', node.instance())
-
-                    elif if_exists and if_exists[1] > order_id:
-                        self._log(f'is updated------------ {str(node.instance())}', 'message')
-                        Database().update(node).commit()
+                        elif if_exists and if_exists[1] > order_id:
+                            self._log(f'is updated------------ {str(node.instance())}', 'message')
+                            Database().update(node).commit()
                     
             except dbException as e:
                 [self._log('--*' * 1, 'error') for x in range(10)]
                 time.sleep(.01)
                 self.insert(order_id=order_id)
             return insert_id
-        except ConnectionError as e:
-            self._log(f'*|* - {order_id}, {e} {recursive_count}', 'warning')
+        except (ConnectionError, Exception) as e:
+            self._log(f'*|* - {order_id}, {e} {recursive_count} {os.getpid()} {type(e)}', 'warning')
             if recursive_count and recursive_count % 10 == 0:
                 time.sleep(0.1)
             self._baseConfig()
