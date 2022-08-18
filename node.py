@@ -39,3 +39,17 @@ class Node:
 
     def private(self):
         return {x: y for x,y in self.instance().items() if x in self.__private_fields}
+
+    def getAttr(self, row):
+        value = getattr(self, row)
+        try:
+            if row in ['created_on', 'last_updated'] and value:
+                return datetime.fromtimestamp(value).strftime('%d-%m-%Y %H:%M')
+            if row == 'id' and value == -1:
+                return 0
+            raise Exception
+        except Exception as e:
+            return value
+        
+            
+

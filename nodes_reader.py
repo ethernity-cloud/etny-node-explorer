@@ -13,6 +13,7 @@ from helpers.exceptions import NotFoundException, DatabaseEngineNotFoundError, B
 import helpers.config as config
 from helpers.terminated_task import TerminatedTask
 from typing import Union
+import gc
 
 from requests.exceptions import ConnectionError
 
@@ -27,7 +28,8 @@ except (ImportError, DatabaseEngineNotFoundError) as e:
 
 TASK_LIFE_TIME = 60
 LIMIT_OF_THREADS = int(cpu_count() * 5)
-
+LOG_MODE = False
+FREE_MEMORY_IN_INTERVAL = False
 
 
 class sharedObject(object):
@@ -79,6 +81,7 @@ class Reader:
                 
                 # [self._log(f"{str(getattr(config.bcolors, x)).split('.')[1]} - something", str(getattr(config.bcolors, x)).split('.')[1]) for x in dir(config.bcolors) if not x.startswith('__')]
 
+                #self._parentProcess(is_inline_process=FALSE)
                 asyncio.run(self._parentProcess(is_inline_process=FALSE))
         except KeyboardInterrupt as e:
             for process in multiprocessing.active_children():
@@ -102,7 +105,7 @@ class Reader:
     def _childProcess(self, block_identifier = None, shared_object = None) -> None:
         if block_identifier:
             self.block_identifier = block_identifier
-        self._log(f'----------block identifier = {self.block_identifier}', 'message')
+        self._log(f'----------block identifier = {self.block_identifier}', 'message', log_mode=LOG_MODE)
         fork_process(block_identifier = self.block_identifier, shared_object=shared_object)
 
     def _async_run(self, i, chared_object = None):
@@ -147,6 +150,7 @@ class Reader:
             currentBlock
         ] = self._action_args()
 
+        old_startBlockNumber = startBlockNumber
         _iter = 0
         self._log(f"{startBlockNumber} {currentBlock} {config.BASE_LOOP_ITER}", 'info')
 
@@ -166,21 +170,33 @@ class Reader:
 
             # terminate on demand
             if is_inline_process:
-                # self._log(f'---progress: {thread.pid}', 'info')
-                asyncio.create_task(self.until_finished(thread, i))
+                pass # asyncio.create_task(self.until_finished(thread, i))
             # terminate on demand
 
             _iter += 1
-            if _iter and _iter % 200 == 0:
-                self._log('need to join threads...')
-                # shared_object = sharedObject(initval=[])
-                if is_inline_process:
-                    shared_object.reset()
-                self.joinAll()
+            if FREE_MEMORY_IN_INTERVAL:
+                if _iter and _iter % int(config.BASE_LOOP_ITER / 2) == 0:
+                    self._log('need to join threads...')
+                    if is_inline_process:
+                        shared_object.reset()
+                        time.sleep(1)
+                    self.joinAll()
+                    print(gc.get_count())
+                    gc.collect()
+                    time.sleep(1)
                 
-
+        [
+            startBlockNumber,
+            currentBlock
+        ] = self._action_args()
 
         self._log(f'iter =  {_iter}')
+
+        if startBlockNumber > old_startBlockNumber and (currentBlock - startBlockNumber) > (config.BASE_LOOP_ITER * 5):
+            self._log(f'------restarting, {currentBlock} - {old_startBlockNumber} | {startBlockNumber}', 'error')
+            return await self._parentProcess(is_inline_process=is_inline_process)
+
+        sys.exit()
 
     async def action(self, cmd = ''):
         inlineProc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, shell=True, preexec_fn=os.setsid)
@@ -193,7 +209,6 @@ class Reader:
         t = time.time()
         while True:
             try:
-                self._log('please register this text somehow ----', 'error')
                 if not thread.is_alive():
                     raise BreackFromLoopException('force')
                 if int(time.time() - t) >= TASK_LIFE_TIME:
@@ -251,7 +266,7 @@ class Reader:
                 self._log(f'current block number {currentBlock}', 'info')
 
             startBlockNumber = blockNumber + 10
-            max_node = Database().select_one(single = 'max(id) as id, order_id')
+            max_node = Database().select_one(single = 'id, max(order_id) as order_id')
             if max_node:
                 if not self.is_child:
                     self._log(f'max node = {max_node}', 'info')
@@ -300,7 +315,8 @@ class Reader:
 
         return time_stamp
 
-    def _log(self, message = '', mode = '_end', hide_prefix = True, terminate = False) -> None:
+    def _log(self, message = '', mode = '_end', hide_prefix = True, terminate = False, log_mode = True) -> None:
+        if not log_mode:return
         mode = str(mode.upper() if type(mode) == str else config.bcolors[mode].name)
         prefix = f"{config.bcolors[mode].value}{config.bcolors.BOLD.value}{config.bcolors[mode].name}{config.bcolors._END.value}: " if mode not in ['_END', 'BOLD', 'UNDERLINE'] and not hide_prefix else ""
         print(f"{prefix}{config.bcolors[mode].value}{str(message)}{config.bcolors._END.value}")
@@ -328,7 +344,7 @@ class fork_process(Reader):
         for order_id in range(self.block_identifier, self.block_identifier + config.BASE_LOOP_ITER, int(config.BASE_LOOP_ITER / 100)):
             currentCounter = self.insert(order_id=order_id)
             itr += 1
-        self._log(f'debug: {itr}, {order_id}, {self.block_identifier}', 'message')
+        self._log(f'debug: {itr}, {order_id}, {self.block_identifier}', 'message', log_mode=LOG_MODE)
 
     def insert(self, order_id, recursive_count = 0):
         try:
@@ -347,7 +363,7 @@ class fork_process(Reader):
                     try:
                         if int(currentCounter) in self.shared_object.value and not recursive_count:return
                         self.shared_object.append(currentCounter)
-                        print('shared object = ', currentCounter, self.shared_object.value, recursive_count, os.getpid())
+                        # print('shared object = ', currentCounter, self.shared_object.value, recursive_count, os.getpid())
                     except ConnectionRefusedError as c:
                         print('----------connection refused...')
 
@@ -355,14 +371,15 @@ class fork_process(Reader):
                 if not if_exists or (if_exists and if_exists[1] > order_id):
                     node = self.getNode(currentCounter, insert_id, order_id)
                     if not node:return
-                    with GLOBAL_LOCK:
-                        if not if_exists:
-                            Database().insert(node)
-                            # print('after inserting: ', node.instance())
+                    # with GLOBAL_LOCK:
+                    Database().reConnect(config=config.config)
+                    if not if_exists:
+                        Database().insert(node)
+                        # print('after inserting: ', node.instance())
 
-                        elif if_exists and if_exists[1] > order_id:
-                            self._log(f'is updated------------ {str(node.instance())}', 'message')
-                            Database().update(node).commit()
+                    elif if_exists and if_exists[1] > order_id:
+                        self._log(f'is updated------------ {str(node.instance())}', 'message', log_mode=LOG_MODE)
+                        Database().update(node).commit()
                     
             except dbException as e:
                 [self._log('--*' * 1, 'error') for x in range(10)]
@@ -370,6 +387,8 @@ class fork_process(Reader):
                 self.insert(order_id=order_id)
             return insert_id
         except (ConnectionError, Exception) as e:
+            if type(e) == ValueError and '--pruning=archive' in str(e):
+                return
             self._log(f'*|* - {order_id}, {e} {recursive_count} {os.getpid()} {type(e)}', 'warning')
             if recursive_count and recursive_count % 10 == 0:
                 time.sleep(0.1)

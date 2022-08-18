@@ -14,7 +14,10 @@ class Database:
         self.dict_cursor = dict_cursor
         self.connect()
 
-    def connect(self) -> None:
+    def reConnect(self, config = None) -> None:
+        pass
+
+    def connect(self, config = None) -> None:
         pass
 
     def init(self) -> None:
@@ -83,18 +86,17 @@ class Database:
         return self._curr.fetchall()
 
 
-    def select_all(self):
+    def select_all(self, limit = 1000):
         query = f'''
             select 
-                o.*,
+                o.id as _id, o.order_id, o.created_on, o.last_updated, o.updates_count,
                 r.*
             from {self.TABLE_NAME} o
             join {self.TABLE_NAME}_details r on r.parent_id = o.id
-            limit 10
+            order by id asc
         '''
-        self._curr.execute(query)
-        result = self._curr.fetchall()
-        return (x for x in result)
+        if limit: query += f" limit {limit}"
+        return query
 
     def extract_args(self, items):
         return ",".join([f"{x} = {y}" if type(y) != str else f"{x} = '{y}'" for x, y in items.items()])

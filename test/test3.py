@@ -5,6 +5,7 @@ from multiprocessing import Process, Pool
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from web3.eth import AsyncEth
+import configparser
 
 
 adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
@@ -13,13 +14,12 @@ session.mount('http://', adapter)
 session.mount('https://', adapter)
 
 sys.path.extend([os.path.join(os.getcwd(), '../')])
-from nodes_reader import Reader, configparser
 
 
 num = 1
 
 connection_string = '''curl -X GET "https://blockexplorer.bloxberg.org/api?module=account&action=balance&address={contractAddress}"'''
-class UsingWeb3(Reader):
+class UsingWeb3():
 
     
     def __init__(self) -> None:
@@ -122,11 +122,15 @@ class mainProcess:
 class withProcess(UsingWeb3):
      
     def __init__(self, is_child = False) -> None:
-        if is_child:    
-            print('there we aredddd')
-            self.inProcess()
-        else:
-            mainProcess()
+        # if is_child:    
+        #     print('there we aredddd')
+        #     self.inProcess()
+        # else:
+        #     mainProcess()
+
+        for i in range(20):
+            t = Process(target = self.inProcess, args = ())
+            t.start()
 
 
     def _baseConfig(self) -> None:
@@ -163,3 +167,21 @@ if __name__ == '__main__':
     parser.add_argument("-c", "--is_child", default=False)
     parser = parser.parse_args()
     withProcess(is_child = parser.is_child)
+
+
+'''
+print(Database().select_one(single = 'id', order_id = 16629033, id = 87098))
+print('-------')
+for item in Database().select_all(single = 'id'):
+    print(item)
+
+l = Database().select_one(single = 'id', id = 87030)
+print('dd1', l)
+l = Database().select_one(id = 87030)
+print('dd2', l)
+# print(Database().select_all())
+
+# print(Database().count(id = 87110))
+# print(Database().count())
+
+'''

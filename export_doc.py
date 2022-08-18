@@ -12,7 +12,6 @@ except (ImportError, DatabaseEngineNotFoundError) as e:
     from helpers.sqlite_database import SqliteDatabase as Database, dbException
 
 
-
 class Writer:
     def __init__(self) -> None:
         self._nodesFile = config.config['DEFAULT']['CSVFile']
@@ -28,7 +27,9 @@ class Writer:
             writer.writerow(Node.all_fields)
             for item in query:
                 node = Node(**item)
-                writer.writerow([getattr(node, x) for x in node.all_fields])
+                if item.get('_id') and item['_id']:
+                    node.id = item.get('_id')
+                writer.writerow([node.getAttr(x) for x in node.all_fields])
 
 
 

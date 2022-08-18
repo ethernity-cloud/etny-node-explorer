@@ -10,10 +10,14 @@ from pymysql.err import IntegrityError as dbException
 
 class MysqlDatabase(Database, metaclass = Singleton):
 
-    def connect(self) -> None:
+    def reConnect(self, config = None) -> None:
+        self.connect(config=config)
+
+    def connect(self, config = None) -> None:
         super().connect()
-        config = configparser.ConfigParser()
-        config.read('config.env')
+        if not config:
+            config = configparser.ConfigParser()
+            config.read('config.env')
 
         try:
             self._conn = pymysql.connect(
@@ -25,7 +29,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
                 charset = 'utf8', 
                 # cursorclass = pymysql.cursors.DictCursor
             )
-            print(self.dict_cursor)
+          
             if self.dict_cursor == True:
                 self._conn.cursorclass = pymysql.cursors.DictCursor
 
@@ -61,7 +65,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
 
         print('init MySql...')
 
-    def insert(self, node):
+    def insert(self, node, recursion_call = 0):
         try:
             public = node.public()
             private = node.private()
@@ -79,12 +83,15 @@ class MysqlDatabase(Database, metaclass = Singleton):
             self._curr.execute(sub_query)
             self._curr.close()
         except pymysql.err.IntegrityError as e:
+            print('-----error while inserting the record: ', str(e))
             self._conn.rollback()
             pass
         except (pymysql.err.ProgrammingError, Exception) as e:
+            if recursion_call > 10:
+                return print('cant retry anymore: ', node.instance())
             time.sleep(1 if type(e) != Exception else 3)
-            print('retry....', str(e))
-            return self.insert(node=node)
+            print('retry....', str(e), node.instance())
+            return self.insert(node=node, recursion_call=recursion_call+1)
         else:
             self._conn.commit()
             self._curr = self._conn.cursor()
@@ -100,6 +107,13 @@ class MysqlDatabase(Database, metaclass = Singleton):
             time.sleep(.1)
             if recursives_count < 10:
                 return self.commit(recursives_count=recursives_count+1)
+
+
+    def select_all(self, limit = 1000):
+        query = super().select_all(limit)
+        self._curr.execute(query)
+        result = self._curr.fetchall()
+        return (x for x in result)
 
 
 if __name__ == '__main__':

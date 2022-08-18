@@ -5,11 +5,13 @@ from sqlite3 import OperationalError as dbException
 
 class SqliteDatabase(Database, metaclass = Singleton):
 
-    DB_NAME = 'orders.db' 
+    DB_NAME = 'orders2.db' 
 
     def connect(self):
         super().connect()
         self._conn = sqlite3.connect(f'{self.DB_NAME}')
+        if self.dict_cursor == True:
+            self._conn.row_factory = sqlite3.Row
         self._curr = self._conn.cursor()
 
     def init(self):
@@ -74,6 +76,12 @@ class SqliteDatabase(Database, metaclass = Singleton):
         except dbException as e:
             print(e)
 
-    
+    def select_all(self, limit = 1000):
+        query = super().select_all(limit=limit)
+        self._curr.execute(query)
+        result = self._curr.fetchall()
+        return self.generator_dict_from_result(result)
 
-
+    def generator_dict_from_result(self, result):
+        return ({'_id': result[i]['id'], **dict(zip(row.keys(), row))} for i, row in enumerate(result))
+        
