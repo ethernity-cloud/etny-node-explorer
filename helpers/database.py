@@ -75,10 +75,16 @@ class Database:
                 return [] if not result else (result[0] if is_single and result and ',' not in kwargs['single'] else [x for x in result if x])
         return wrapper
 
+
+    def raw_select(self, query):
+        self._curr.execute(query)
+        result = self._curr.fetchall()
+        return (x for x in result) # generator
+
     def get_missing_items(self):
         query = f'''
             select 
-                o.id, o.order_id
+                o.id, o.block_identifier
             from {self.TABLE_NAME} o
             where not exists (select id from {self.TABLE_NAME}_details where parent_id = o.id)
         '''
@@ -89,7 +95,7 @@ class Database:
     def select_all(self, limit = 1000):
         query = f'''
             select 
-                o.id as _id, o.order_id, o.created_on, o.last_updated, o.updates_count,
+                o.id as _id, o.block_identifier, o.created_on, o.last_updated, o.updates_count,
                 r.*
             from {self.TABLE_NAME} o
             join {self.TABLE_NAME}_details r on r.parent_id = o.id

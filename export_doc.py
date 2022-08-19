@@ -21,15 +21,18 @@ class Writer:
 
         Database(dict_cursor=True).init()
 
-        query = Database().select_all()
+        query = Database().select_all(limit = 0)
         with open(self._nodesFile, 'w',newline='') as output_file:
             writer = csv.writer(output_file, dialect="excel-tab")
             writer.writerow(Node.all_fields)
+            _iter = 0
             for item in query:
                 node = Node(**item)
                 if item.get('_id') and item['_id']:
                     node.id = item.get('_id')
                 writer.writerow([node.getAttr(x) for x in node.all_fields])
+                _iter += 1
+            print(_iter)
 
 
 

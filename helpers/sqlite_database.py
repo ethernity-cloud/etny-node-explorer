@@ -5,7 +5,7 @@ from sqlite3 import OperationalError as dbException
 
 class SqliteDatabase(Database, metaclass = Singleton):
 
-    DB_NAME = 'orders2.db' 
+    DB_NAME = 'orders6.db' 
 
     def connect(self):
         super().connect()
@@ -17,7 +17,8 @@ class SqliteDatabase(Database, metaclass = Singleton):
     def init(self):
         self._curr.execute(f'''CREATE TABLE IF NOT EXISTS {self.TABLE_NAME} (
                 id bigint(20) primary key, 
-                order_id bigint(20) default 0,
+                block_identifier bigint(20) default 0,
+                insert_date int(11) not null default 0,
                 created_on int(11) not null default 0,
                 last_updated int(11) not null default 0,
                 updates_count int(11) not null default 0
@@ -44,9 +45,9 @@ class SqliteDatabase(Database, metaclass = Singleton):
             public = node.public()
             private = node.private()
             # root
-            query = f'''insert into {self.TABLE_NAME} ({",".join(private.keys())}, created_on) 
+            query = f'''insert into {self.TABLE_NAME} ({",".join(private.keys())}) 
                             values 
-                        ({",".join([f"'{x}'" if type(x) == str else f'{x}' for x in [*private.values()]])}, {int(time.time())})'''
+                        ({",".join([f"'{x}'" if type(x) == str else f'{x}' for x in [*private.values()]])})'''
             
             self._curr.execute(query)
             insert_id = self._curr.lastrowid

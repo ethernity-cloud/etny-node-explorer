@@ -3,11 +3,11 @@ from datetime import datetime
 
 class Node:
     
-    __private_fields = ['id', 'order_id', 'created_on', 'last_updated', 'updates_count']
+    __private_fields = ['id', 'block_identifier', 'created_on', 'last_updated', 'updates_count']
 
     all_fields = [
         'id',
-        'order_id',
+        'block_identifier',
         'address',
         'cpu',
         'memory',

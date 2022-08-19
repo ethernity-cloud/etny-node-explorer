@@ -41,7 +41,8 @@ class MysqlDatabase(Database, metaclass = Singleton):
     def init(self):
         self._curr.execute(f'''CREATE TABLE IF NOT EXISTS {self.TABLE_NAME} (
                 id bigint(20) primary key auto_increment, 
-                order_id bigint(20) default 0,
+                block_identifier bigint(20) default 0,
+                insert_date int(11) not null default 0,
                 created_on int(11) not null default 0,
                 last_updated int(11) not null default 0,
                 updates_count int(11) not null default 0
@@ -61,8 +62,6 @@ class MysqlDatabase(Database, metaclass = Singleton):
                 index parent_id(parent_id)
             )''')
 
-        self._curr.execute(f'''create table if not exists shared_object (v int(11) not null default 0); ''')
-
         print('init MySql...')
 
     def insert(self, node, recursion_call = 0):
@@ -71,7 +70,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
             private = node.private()
             self._conn.begin()
             # root
-            query = f'''insert into {self.TABLE_NAME} set {self.extract_args({**private, 'created_on': int(time.time())})}'''
+            query = f'''insert into {self.TABLE_NAME} set {self.extract_args({**private})}'''
             self._curr.execute(query)
             insert_id = self._curr.lastrowid 
             if not insert_id:
@@ -83,7 +82,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
             self._curr.execute(sub_query)
             self._curr.close()
         except pymysql.err.IntegrityError as e:
-            print('-----error while inserting the record: ', str(e))
+            print('-----error while inserting the record: ', str(e), os.getpid())
             self._conn.rollback()
             pass
         except (pymysql.err.ProgrammingError, Exception) as e:

@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
 
 '''
-print(Database().select_one(single = 'id', order_id = 16629033, id = 87098))
+print(Database().select_one(single = 'id', block_identifier = 16629033, id = 87098))
 print('-------')
 for item in Database().select_all(single = 'id'):
     print(item)
