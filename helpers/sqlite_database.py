@@ -19,6 +19,7 @@ class SqliteDatabase(Database, metaclass = Singleton):
                 id bigint(20) primary key, 
                 block_identifier bigint(20) default 0,
                 insert_date int(11) not null default 0,
+                update_date int(11) not null default 0,
                 created_on int(11) not null default 0,
                 last_updated int(11) not null default 0,
                 updates_count int(11) not null default 0

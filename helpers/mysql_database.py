@@ -43,6 +43,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
                 id bigint(20) primary key auto_increment, 
                 block_identifier bigint(20) default 0,
                 insert_date int(11) not null default 0,
+                update_date int(11) not null default 0,
                 created_on int(11) not null default 0,
                 last_updated int(11) not null default 0,
                 updates_count int(11) not null default 0
@@ -82,7 +83,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
             self._curr.execute(sub_query)
             self._curr.close()
         except pymysql.err.IntegrityError as e:
-            print('-----error while inserting the record: ', str(e), os.getpid())
+            print('-----error while inserting the record: ', str(e),  str(node.block_identifier), str(node.id), os.getpid())
             self._conn.rollback()
             pass
         except (pymysql.err.ProgrammingError, Exception) as e:
