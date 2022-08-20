@@ -5,7 +5,7 @@ from sqlite3 import OperationalError as dbException
 
 class SqliteDatabase(Database, metaclass = Singleton):
 
-    DB_NAME = 'orders6.db' 
+    DB_NAME = 'orders.db' 
 
     def connect(self):
         super().connect()
@@ -87,3 +87,5 @@ class SqliteDatabase(Database, metaclass = Singleton):
     def generator_dict_from_result(self, result):
         return ({'_id': result[i]['id'], **dict(zip(row.keys(), row))} for i, row in enumerate(result))
         
+    def select_concat_field(self):
+        return "(select block_identifier || '-' || (block_identifier - d.block_identifier) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_id_and_block_identifier"

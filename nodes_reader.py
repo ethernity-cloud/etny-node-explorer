@@ -27,7 +27,7 @@ except (ImportError, DatabaseEngineNotFoundError) as e:
 # config section
 
 TASK_LIFE_TIME = 60
-LIMIT_OF_THREADS = int(cpu_count() * 5)
+LIMIT_OF_THREADS = int(cpu_count() * 8)
 LOG_IS_ENABLED = False
 FREE_MEMORY_IN_INTERVAL = True
 
@@ -137,8 +137,6 @@ class Reader:
         thread.daemon = deamon
         thread.start()
 
-        # self._childProcess(block_identifier, shared_object, queryBlock)
-
         # terminate on demand
         if self.is_inline_process:
             pass # asyncio.create_task(self.until_finished(thread, i))
@@ -209,7 +207,6 @@ class Reader:
             # [real_id, missing_id_from, next_id, diff, block_identifier, next_block_identifier_and_diff] = block
             if len(queryBlock) < 4:return
             queryBlock = queryBlock + (with_block_identifiers,)
-            print('queryBlock = ', queryBlock)
             self._loopContent(block_identifier=None, shared_object=shared_object, _iter = _iter, deamon=False, queryBlock = queryBlock)
 
         for with_block_identifier in [True, False]:
@@ -217,7 +214,6 @@ class Reader:
 
         self._log(f'----------finished all the threads')
 
-        sys.exit()
 
     def _getMissingRecords(self, limit = 1):
         per_request = 10
@@ -227,10 +223,10 @@ class Reader:
                         (select min(id) from orders where id > d.id) as next_id,
                         ((select min(id) from orders where id > d.id) - (id + 1)) as diff,
                         d.block_identifier,
-                        (select concat(block_identifier, '-', (block_identifier - d.block_identifier)) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_block_identifier_and_diff
+                        {Database().select_concat_field()}
                     from orders d 
                     where d.id > -1 and not exists (select id from orders where id = d.id + 1) and d.id < (select max(id) from orders) 
-                    limit {limit * per_request if limit > 1 else 0}, {per_request}
+                    limit {(limit - 1) * per_request if limit > 1 else 0}, {per_request}
                 '''
         result = Database().raw_select(query=query)
         if LOG_IS_ENABLED:
@@ -368,6 +364,7 @@ class fork_process(Reader):
         itr = 0
         self._log('------------here2', 'error')
         for currentCounter in range(missing_id_from, next_id):  
+            print(currentCounter, missing_id_from, next_id, block_identifier)
             self.insert(currentCounter=currentCounter, block_identifier=block_identifier)
             itr += 1
         self._log(f'debug for missing items with id: {itr}, {missing_id_from} {next_id} {block_identifier}', 'message')
@@ -381,7 +378,6 @@ class fork_process(Reader):
             if self.queryBlock != None:pass
             try:
                 insert_id = currentCounter if currentCounter > 0 else -1
-
                 # inline buffer
                 if insert_id in self.local_buffer:return
                 if len(self.local_buffer) > 20:
@@ -397,13 +393,13 @@ class fork_process(Reader):
                     except ConnectionRefusedError as c:
                         print('----------connection refused...', str(c))
 
+                if not self.isDatabaseReconnected:
+                    Database().reConnect(config=config.config)
                 if_exists = Database().select_one(single = 'id, block_identifier', id = insert_id)
                 if not if_exists or (if_exists and if_exists[1] > block_identifier):
                     node = self._getNode(currentCounter, insert_id, block_identifier)
                     if not node:return
                     # with GLOBAL_LOCK:
-                    if not self.isDatabaseReconnected:
-                        Database().reConnect(config=config.config)
                     _date = self._getTimestamp(block_identifier=block_identifier)
                     if not if_exists:
                         node.created_on = _date
@@ -421,6 +417,7 @@ class fork_process(Reader):
             return insert_id
         except (ConnectionError, Exception) as e:
             if type(e) == ValueError and '--pruning=archive' in str(e):
+                print(e)
                 return
             self._log(f'*|* - {block_identifier}, {e} {recursive_count} {os.getpid()} {type(e)}', 'warning')
             exc_type, exc_obj, exc_tb = sys.exc_info()

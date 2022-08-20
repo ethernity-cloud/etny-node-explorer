@@ -116,5 +116,9 @@ class MysqlDatabase(Database, metaclass = Singleton):
         return (x for x in result)
 
 
+    def select_concat_field(self):
+        return "(select concat(block_identifier, '-', (block_identifier - d.block_identifier)) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_id_and_block_identifier"
+
+
 if __name__ == '__main__':
     Database().dropTable()
