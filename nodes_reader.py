@@ -219,8 +219,13 @@ class Reader:
 
         logger.info('Completed all threads')
 
-    def get_number_of_missing_items(self):
-        items_count = Database().number_of_missing_items()
+    def get_number_of_missing_items(self, recursion_count = 0):
+        try:
+            items_count = Database().number_of_missing_items()
+        except dbException as e:
+            if recursion_count > 10:
+                return 0
+            return self.get_number_of_missing_items(recursion_count=recursion_count+1)
         return items_count[0] if items_count else 0
 
     def _getMissingRecords(self, limit = 1):

@@ -30,7 +30,7 @@ def getLogger():
     fmt = '%(asctime)s %(message)s'
     formatter = logging.Formatter(fmt)
     handler.setFormatter(formatter)
-    handler.setFormatter(CustomFormatter(fmt))
+    # handler.setFormatter(CustomFormatter(fmt))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     return logger
