@@ -20,7 +20,7 @@ class Node:
         'last_updated',
         'updates_count'
     ]
-
+    
     def __init__(self, **kwargs):
         for field in self.all_fields:
             setattr(self, field, kwargs.get(field))

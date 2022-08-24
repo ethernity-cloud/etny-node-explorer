@@ -1,24 +1,29 @@
 
 import time
 
-
+ 
 class dbException(Exception):
     pass
 
 class Database:
     TABLE_NAME = 'orders'
-    _conn, _curr = None, None
+    _conn, _curr, logger = None, None, None
+    queryLogIsEnabled = False
 
     dict_cursor = False
-    def __init__(self, dict_cursor = False) -> None:
+    def __init__(self, dict_cursor = False, config = None, logger = None) -> None:
         self.dict_cursor = dict_cursor
-        self.connect()
+        self.logger = logger
+        self.connect(config=config)
 
     def reConnect(self, config = None) -> None:
         pass
 
     def connect(self, config = None) -> None:
-        pass
+        try:
+            self.queryLogIsEnabled = config['DATABASE']['queryLogIsEnabled'] in ['True', '1']
+        except (ValueError, TypeError) as e:
+            pass
 
     def init(self) -> None:
         pass
@@ -40,11 +45,11 @@ class Database:
     def update(self, node):
         public = node.public()
         private = node.private()
-        query = f'''update {self.TABLE_NAME} set 
-                        {self.extract_args({x: y for x, y in private.items() if x not in ['id']})}, last_updated = {int(time.time())}, updates_count = updates_count + 1
-                    where id = {node.id}'''
+        query = f'''update {self.TABLE_NAME} set  {self.extract_args({x: y for x, y in private.items() if x not in ['id']})}, updates_count = updates_count + 1 where id = {node.id}'''
+        if self.queryLogIsEnabled:
+            print(query)
         sub_query = f'''update {self.TABLE_NAME}_details set 
-                            {self.extract_args({**public})}
+                            {self.extract_args({**public})}, update_date = {int(time.time())}
                         where parent_id = {node.id}'''
         self._curr.execute(query)
         self._curr.execute(sub_query)
@@ -81,28 +86,51 @@ class Database:
         result = self._curr.fetchall()
         return (x for x in result) # generator
 
-    def get_missing_items(self):
+    def number_of_missing_items(self):
         query = f'''
             select 
-                o.id, o.block_identifier
-            from {self.TABLE_NAME} o
-            where not exists (select id from {self.TABLE_NAME}_details where parent_id = o.id)
+                count(d.id)
+            from {self.TABLE_NAME} d 
+            where id > -1 and not exists (select id from {self.TABLE_NAME} where id = d.id + 1) and d.id < (select max(id) from {self.TABLE_NAME});
         '''
         query = self._curr.execute(query)
-        return self._curr.fetchall()
+        return self._curr.fetchone()
 
 
     def select_all(self, limit = 1000):
         query = f'''
             select 
-                o.id as _id, o.block_identifier, o.created_on, o.last_updated, o.updates_count,
-                r.*
-            from {self.TABLE_NAME} o
-            join {self.TABLE_NAME}_details r on r.parent_id = o.id
-            order by id asc
+                o1.id,
+                o1.block_identifier,
+                o2.block_identifier,
+                d.address,
+                d.cpu,
+                d.memory,
+                d.storage,
+                d.bandwith,
+                d.duration,
+                d.status,
+                d.cost,
+                o1.created_on,
+                o2.last_updated,
+                (o1.updates_count + o2.updates_count) as updates_count
+            from {self.TABLE_NAME}_details d 
+            join (select * from {self.TABLE_NAME} order by created_on asc) o1 on o1.id = d.parent_id
+            join (select * from {self.TABLE_NAME} order by last_updated desc) o2 on o2.id = d.parent_id 
+            group by d.address order by d.id
         '''
         if limit: query += f" limit {limit}"
         return query
+
+
+    def count_of_left_nodes(self):
+        self._curr.execute(f'''
+            select 
+                count(d.id) as id
+            from orders d 
+            where id > -1 and not exists (select id from orders where id = d.id + 1) and d.id < (select max(id) from orders);
+        ''')
+        return self._curr.fetchone()
 
     def extract_args(self, items):
         return ",".join([f"{x} = {y}" if type(y) != str else f"{x} = '{y}'" for x, y in items.items()])

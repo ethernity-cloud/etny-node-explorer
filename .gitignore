@@ -130,3 +130,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+*.db
+*.csv
+*.log.*
+*db-journal

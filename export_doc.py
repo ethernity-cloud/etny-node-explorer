@@ -1,28 +1,18 @@
-import csv
-from node import Node
+from datetime import datetime
+import csv, os
+from node import Node 
+from config import Database, dbException
 
-import helpers.config as config  
-from helpers.exceptions import NotFoundException, DatabaseEngineNotFoundError, BreackFromLoopException
+class CSVFileGenerator:
 
-try:
-    if config.config['DATABASE']['engine'] != 'MYSQL':
-        raise DatabaseEngineNotFoundError('For DB Engine is used Sqlite')
-    from helpers.mysql_database import MysqlDatabase as Database, dbException
-except (ImportError, DatabaseEngineNotFoundError) as e:
-    from helpers.sqlite_database import SqliteDatabase as Database, dbException
+    def __init__(self):
 
+        fileName = f'''documents/orders-{datetime.now().strftime('%d-%m-%Y_%H-%M')}.csv'''
+        self._nodesFile = os.path.join(os.getcwd(), fileName)
 
-class Writer:
-    def __init__(self) -> None:
-        self._nodesFile = config.config['DEFAULT']['CSVFile']
-        self.init()
-
-    def init(self):
-
-        Database(dict_cursor=True).init()
-
+        Database().connect(has_dict_cursor = True)
         query = Database().select_all(limit = 0)
-        with open(self._nodesFile, 'w',newline='') as output_file:
+        with open(self._nodesFile, 'w', newline='') as output_file:
             writer = csv.writer(output_file, dialect="excel-tab")
             writer.writerow(Node.all_fields)
             _iter = 0
@@ -32,11 +22,11 @@ class Writer:
                     node.id = item.get('_id')
                 writer.writerow([node.getAttr(x) for x in node.all_fields])
                 _iter += 1
-            print(_iter)
+            print(f'''\n\nThe file "{fileName}" with {_iter} records was created. ''')
 
 
 
 if __name__ == '__main__':
-    Writer()
+    CSVFileGenerator()
 
 

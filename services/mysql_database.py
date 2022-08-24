@@ -1,9 +1,9 @@
 import os, sys, time, pymysql, configparser
 try:
-    from helpers.singleton import Singleton
-    from helpers.database import Database
+    from src.singleton import Singleton
+    from services.database import Database
 except ImportError:
-    from singleton import Singleton
+    from src.singleton import Singleton
     from database import Database
 
 from pymysql.err import IntegrityError as dbException
@@ -14,7 +14,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
         self.connect(config=config)
 
     def connect(self, config = None) -> None:
-        super().connect()
+        super().connect(config = config)
         if not config:
             config = configparser.ConfigParser()
             config.read('config.env')
@@ -71,14 +71,15 @@ class MysqlDatabase(Database, metaclass = Singleton):
             private = node.private()
             self._conn.begin()
             # root
-            query = f'''insert into {self.TABLE_NAME} set {self.extract_args({**private})}'''
+            query = f'''insert into {self.TABLE_NAME} set {self.extract_args({**private})}, insert_date = {int(time.time())}'''
             self._curr.execute(query)
             insert_id = self._curr.lastrowid 
             if not insert_id:
                 raise Exception(f'insert id not found - {insert_id}, :', query)
             # child
             sub_query = f'''insert into {self.TABLE_NAME}_details set {self.extract_args({**public, 'parent_id': (insert_id if insert_id and insert_id < 1844674407 else -1)})}'''
-            print(query)
+            if self.queryLogIsEnabled:
+                print(query)
             # print(sub_query)
             self._curr.execute(sub_query)
             self._curr.close()
@@ -116,7 +117,7 @@ class MysqlDatabase(Database, metaclass = Singleton):
         return (x for x in result)
 
 
-    def select_concat_field(self):
+    def get_concatenated_fields(self):
         return "(select concat(block_identifier, '-', (block_identifier - d.block_identifier)) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_id_and_block_identifier"
 
 
