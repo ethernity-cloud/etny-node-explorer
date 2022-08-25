@@ -9,6 +9,8 @@ class CSVFileGenerator:
 
         fileName = f'''documents/orders-{datetime.now().strftime('%d-%m-%Y_%H-%M')}.csv'''
         self._nodesFile = os.path.join(os.getcwd(), fileName)
+        if not os.path.exists(os.path.join(os.getcwd(), 'documents')):
+            os.mkdir(os.path.join(os.getcwd(), 'documents'))
 
         Database().connect(has_dict_cursor = True)
         query = Database().select_all(limit = 0)
