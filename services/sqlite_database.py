@@ -1,3 +1,4 @@
+from socket import timeout
 from datetime import datetime
 import sqlite3, configparser
 from src.singleton import Singleton
@@ -7,13 +8,16 @@ from sqlite3 import OperationalError as dbException
 
 class SqliteDatabase(Database, metaclass = Singleton):
 
+    def reConnect(self, config = None) -> None:
+        self.connect(config=config)
+
     def connect(self, config = None, has_dict_cursor = False):
         super().connect(config=config)
         if not config:
             config = configparser.ConfigParser()
             config.read('config.env')
 
-        self._conn = sqlite3.connect(config['SQLITE']['DB_DATABASE'])
+        self._conn = sqlite3.connect(config['SQLITE']['DB_DATABASE'], timeout=15)
 
         if self.dict_cursor == True or has_dict_cursor:
             self._conn.row_factory = sqlite3.Row

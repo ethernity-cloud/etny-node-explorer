@@ -262,7 +262,7 @@ class Reader:
             ]
         except (dbException, TypeError) as e:
             logger.error(f'-----{e}')
-            time.sleep(0.01)
+            time.sleep(0.01 if type(e) == TypeError else 5)
             return self._action_args()
 
     def _get_contract_abi(self) -> str:
@@ -379,7 +379,8 @@ class fork_process(Reader):
             except dbException as e:
                 self._getDetailedExceptionInfo()
                 logger.error(f"'--* - {str(e)}, insert_id = {insert_id}")
-                time.sleep(.01)
+                time.sleep(5)
+                Database().reConnect(config = config.config)
                 return self.insert(currentCounter = currentCounter, block_identifier=block_identifier)
 
             if self.shared_object:
