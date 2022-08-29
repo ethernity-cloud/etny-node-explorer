@@ -102,7 +102,6 @@ class Database:
             select 
                 o1.id,
                 o1.block_identifier,
-                o2.block_identifier,
                 d.address,
                 d.cpu,
                 d.memory,
@@ -112,13 +111,16 @@ class Database:
                 d.status,
                 d.cost,
                 o1.created_on,
-                o2.last_updated,
-                (o1.updates_count + o2.updates_count) as updates_count
+                -- (select created_on from {self.TABLE_NAME} where id = d.parent_id order by id desc) as last_updated,
+                o3.last_updated,
+                count(o2.address) as updates_count
             from {self.TABLE_NAME}_details d 
             join (select * from {self.TABLE_NAME} order by created_on asc) o1 on o1.id = d.parent_id
-            join (select * from {self.TABLE_NAME} order by last_updated desc) o2 on o2.id = d.parent_id 
+            join (select * from {self.TABLE_NAME}_details order by id desc) o2 on o2.parent_id = d.parent_id
+            join (select * from orders order by last_updated desc) o3 on o3.id = d.parent_id
             group by d.address order by d.id
         '''
+
         if limit: query += f" limit {limit}"
         return query
 
