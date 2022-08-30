@@ -48,6 +48,7 @@ class SqliteDatabase(Database, metaclass = Singleton):
                 FOREIGN KEY (parent_id) REFERENCES {self.TABLE_NAME}(id)
             )''')
         self._curr.execute(f'''CREATE INDEX if not exists parent_id ON {self.TABLE_NAME}_details (parent_id);''')
+        self._curr.execute(f'''CREATE INDEX if not exists address ON {self.TABLE_NAME}_details (address);''')
         print('init Sqlite...')
         self._conn.commit()
 

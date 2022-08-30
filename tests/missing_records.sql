@@ -71,6 +71,49 @@ from orders_details d
 join (select * from orders order by created_on asc) o1 on o1.id = d.parent_id
 join (select * from orders order by last_updated desc) o2 on o2.id = d.parent_id
 group by d.address
+
+
+select 
+    o1.id,
+    o1.block_identifier,
+    d.address,
+    d.cpu,
+    d.memory,
+    d.storage,
+    d.bandwith,
+    d.duration,
+    d.status,
+    d.cost,
+    o1.created_on,
+    (select (case when last_updated then last_updated else created_on end) from orders where id = o2.parent_id order by id desc) as last_updated,
+    count(o2.address) as updates_count
+from orders_details d 
+join (select * from orders order by created_on asc) o1 on o1.id = d.parent_id
+join (select * from orders_details order by id desc) o2 on o2.parent_id = d.parent_id
+-- join (select * from orders order by last_updated desc) o3 on o3.id = d.parent_id
+where d.address in ('0xfB8aAb6608E96E901630AD1D5de2c47C2710EAf1')
+group by d.address;
+
+select 
+    o1.id,
+    o1.block_identifier,
+    d.address,
+    d.cpu,
+    d.memory,
+    d.storage,
+    d.bandwith,
+    d.duration,
+    d.status,
+    d.cost,
+    o1.created_on,
+    -- (select (case when last_updated then last_updated else created_on end) from orders where id = d.parent_id order by id desc) as last_updated,
+    (case o3.last_updated then o3.last_updated else o3.created_on) as last_updated,
+    count(o2.address) as updates_count
+from orders_details d 
+join (select * from orders order by created_on asc) o1 on o1.id = d.parent_id
+join (select * from orders_details order by id desc) o2 on o2.parent_id = d.parent_id
+join (select * from orders order by last_updated desc) o3 on o3.id = d.parent_id
+group by d.address order by d.id 
 limit 20;
 
 
@@ -78,3 +121,30 @@ select
     count(distinct d.address)
 from orders o
 join orders_details d on d.parent_id = o.id
+
+
+
+
+select 
+    o1.id,
+    o1.block_identifier,
+    d.address,
+    d.cpu,
+    d.memory,
+    d.storage,
+    d.bandwith,
+    d.duration,
+    d.status,
+    d.cost,
+    o1.created_on,
+    -- (select created_on from orders where id = d.parent_id order by (case when last_updated then last_updated else created_on end) desc) as last_updated,
+    o2.insert_date as last_updated,
+    count(o2.address) as updates_count
+from orders_details d 
+join (select * from orders order by created_on asc) o1 on o1.id = d.parent_id
+join (select * from orders_details order by id desc) o2 on o2.parent_id = d.parent_id
+where d.address in ('0xfB8aAb6608E96E901630AD1D5de2c47C2710EAf1')
+group by d.address order by d.id;
+
+
+

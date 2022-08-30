@@ -111,15 +111,16 @@ class Database:
                 d.status,
                 d.cost,
                 o1.created_on,
-                -- (select created_on from {self.TABLE_NAME} where id = d.parent_id order by id desc) as last_updated,
-                o3.last_updated,
+                -- (select created_on from {self.TABLE_NAME} where id = d.parent_id order by (case when last_updated then last_updated else created_on end) desc) as last_updated,
+                max(d.insert_date) as last_updated,
                 count(o2.address) as updates_count
             from {self.TABLE_NAME}_details d 
             join (select * from {self.TABLE_NAME} order by created_on asc) o1 on o1.id = d.parent_id
             join (select * from {self.TABLE_NAME}_details order by id desc) o2 on o2.parent_id = d.parent_id
-            join (select * from orders order by last_updated desc) o3 on o3.id = d.parent_id
-            group by d.address order by d.id
+            group by d.address order by d.id;
         '''
+
+        print(query)
 
         if limit: query += f" limit {limit}"
         return query
