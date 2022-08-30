@@ -121,8 +121,6 @@ class Database:
             group by d.address order by d.id;
         '''
 
-        print(query)
-
         if limit: query += f" limit {limit}"
         return query
 
