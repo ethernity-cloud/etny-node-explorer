@@ -27,6 +27,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+*.json
+*.csv
+*.db
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -97,7 +100,7 @@ __pypackages__/
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
-
+./documents/*
 # SageMath parsed files
 *.sage.py
 
@@ -127,3 +130,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+*.db
+*.csv
+*.log.*
+*db-journal
