@@ -347,19 +347,6 @@ class fork_process(Reader):
                         raise Exception(f'block is currently created: {block_identifier}, skipping...')
             try:
                 insert_id = currentCounter if currentCounter != None and currentCounter > 0 else -1
-                
-                # inline buffer
-                if insert_id in self.local_buffer:return
-                if len(self.local_buffer) > 20:
-                    self.local_buffer = set()
-                
-                # shared buffer
-                if self.shared_object:
-                    try:
-                        if int(insert_id) in self.shared_object.value and not count_recursive_calls:return
-                        # print('shared object = ', currentCounter, self.shared_object.value, count_recursive_calls, os.getpid())
-                    except (ConnectionRefusedError, BrokenPipeError) as e:
-                        logger.error(str(e))
                     
                 if not self.isDatabaseReconnected:
                     Database().reConnect(config=config.config)
@@ -383,14 +370,14 @@ class fork_process(Reader):
                 Database().reConnect(config = config.config)
                 return self.insert(currentCounter = currentCounter, block_identifier=block_identifier)
 
-            if self.shared_object:
-                try:
-                    self.shared_object.append(insert_id) # shared buffer
-                except (ConnectionRefusedError, FileNotFoundError) as e:
-                    time.sleep(.1)
-                    logger.warning(f'The shared object has been blocked, insert_id: {insert_id}, {str(e)}')
+            # if self.shared_object:
+            #     try:
+            #         self.shared_object.append(insert_id) # shared buffer
+            #     except (ConnectionRefusedError, FileNotFoundError) as e:
+            #         time.sleep(.1)
+            #         logger.warning(f'The shared object has been blocked, insert_id: {insert_id}, {str(e)}')
 
-            self.local_buffer.add(insert_id) # local buffer
+            # self.local_buffer.add(insert_id) # local buffer
             return insert_id
 
         except RecursionError as e:
@@ -434,12 +421,13 @@ class fork_process(Reader):
     def _getTimestamp(self, block_identifier, recursived_count = 0) -> int:
         try:
             timestamp = self._w3.eth.getBlock(block_identifier).timestamp
-            if not timestamp and recursived_count < 10:
-                return self._getTimestamp(block_identifier=block_identifier - 1, recursived_count=recursived_count + 1)
+            if not timestamp and recursived_count < 16:
+                block_identifier = block_identifier - 1 if recursived_count and recursived_count % 4 == 0 else block_identifier
+                return self._getTimestamp(block_identifier=block_identifier, recursived_count=recursived_count + 1)
             return timestamp
         except Exception as e:
             logger.error('error while getting timestamp...')
-        return int(time.time())
+        return 0
 
     def _getDetailedExceptionInfo(self):
         exc_type, exc_obj, exc_tb = sys.exc_info()

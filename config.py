@@ -20,7 +20,7 @@ except (ImportError, DatabaseEngineNotFoundError) as e:
 
 
 BASE_LOOP_ITER = 1000 
-LIMIT_OF_THREADS = 32 # int(cpu_count() * 8)
+LIMIT_OF_THREADS = int(cpu_count() * 8)
 FREE_MEMORY_IN_INTERVAL = True
 
 

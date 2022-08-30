@@ -137,8 +137,8 @@ select
     d.status,
     d.cost,
     o1.created_on,
-    -- (select created_on from orders where id = d.parent_id order by (case when last_updated then last_updated else created_on end) desc) as last_updated,
-    o2.insert_date as last_updated,
+    group_concat(o1.last_updated) as sms,
+    max(o1.last_updated) as last_updated,
     count(o2.address) as updates_count
 from orders_details d 
 join (select * from orders order by created_on asc) o1 on o1.id = d.parent_id

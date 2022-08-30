@@ -112,7 +112,8 @@ class Database:
                 d.cost,
                 o1.created_on,
                 -- (select created_on from {self.TABLE_NAME} where id = d.parent_id order by (case when last_updated then last_updated else created_on end) desc) as last_updated,
-                max(d.insert_date) as last_updated,
+                -- max(d.insert_date) as last_updated,
+                max((case when o1.last_updated then o1.last_updated else o1.created_on end)) as last_updated,
                 count(o2.address) as updates_count
             from {self.TABLE_NAME}_details d 
             join (select * from {self.TABLE_NAME} order by created_on asc) o1 on o1.id = d.parent_id
