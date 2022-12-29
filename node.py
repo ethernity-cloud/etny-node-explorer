@@ -44,7 +44,7 @@ class Node:
         value = getattr(self, row)
         try:
             if row in ['created_on', 'last_updated'] and value:
-                return datetime.fromtimestamp(value).strftime('%d-%m-%Y %H:%M')
+                return datetime.fromtimestamp(value).isoformat()
             if row == 'id' and value == -1:
                 return 0
             raise Exception
