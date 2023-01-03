@@ -9,5 +9,8 @@ mysql -e "create database if not exists ${DB_DATABASE} character set utf8 collat
 mysql -e "create user if not exists ${DB_USERNAME}@${DB_HOST_ALIAS} identified by '${DB_PASSWORD}';"
 mysql -e "grant all on ${DB_DATABASE}.* to ${DB_USERNAME}@${DB_HOST_ALIAS};";
 mysql -e "flush privileges";
-
+mysql -e "use ${DB_DATABASE}";
 echo "database have been created..."
+# create tables 
+
+cat ./database/*.sql | mysql ${DB_DATABASE}

@@ -121,5 +121,19 @@ class MysqlDatabase(Database, metaclass = Singleton):
         return "(select concat(block_identifier, '-', (block_identifier - d.block_identifier)) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_id_and_block_identifier"
 
 
+    # new
+    def storeDPRequests(self, models):
+        keys = models[0].keys
+        sql = f'''INSERT ignore into dp_requests ({",".join(keys)}) values '''
+        values = []
+        for model in models:
+            items = model.items
+            v = [f"'{items[x]}'" if type(items[x]) == str else str(items[x]) for x in keys]
+            values.append(f'''( {",".join(v)}  )''')
+        sql += ",".join(values)
+        self._curr.execute(sql)
+        self._conn.commit()
+
+
 if __name__ == '__main__':
     Database().dropTable()

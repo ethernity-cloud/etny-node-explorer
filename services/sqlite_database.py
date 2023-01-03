@@ -47,8 +47,30 @@ class SqliteDatabase(Database, metaclass = Singleton):
                 cost decimal(10, 2) not null default 0.00,
                 FOREIGN KEY (parent_id) REFERENCES {self.TABLE_NAME}(id)
             )''')
+
+        # self._curr.execute("drop table if exists dp_requests;")
+        self._curr.execute(f'''create table if not exists dp_requests (
+                id bigint(20) primary key,
+                dpRequestId bigint(20) UNIQUE default 0,
+                dproc varchar(70) not null default '',
+                cpuRequest tinyint(3) not null default 0,
+                memoryRequest tinyint(3) not null default 0,
+                storageRequest tinyint(3) not null default 0,
+                bandwidthRequest tinyint(3) not null default 0,
+                duration tinyint(3) not null default 0,
+                minPrice tinyint(3) not null default 0,
+                `status` tinyint(3) not null default 0,
+
+                createdAt int(11) not null default 0,
+                local_created_at int(11) not null default (cast(strftime('%s','now') as int))
+            )''')
+
         self._curr.execute(f'''CREATE INDEX if not exists parent_id ON {self.TABLE_NAME}_details (parent_id);''')
         self._curr.execute(f'''CREATE INDEX if not exists address ON {self.TABLE_NAME}_details (address);''')
+
+        self._curr.execute(f'''CREATE INDEX if not exists dp_requests_dproc_idx ON  dp_requests (dproc);''')
+        self._curr.execute(f'''CREATE INDEX if not exists dp_requests_dpRequestId_idx ON  dp_requests (dpRequestId);''')
+        self._curr.execute(f'''CREATE INDEX if not exists dp_requests_createdAt_idx ON  dp_requests (createdAt);''')
         print('init Sqlite...')
         self._conn.commit()
 
@@ -107,3 +129,16 @@ class SqliteDatabase(Database, metaclass = Singleton):
         
     def get_concatenated_fields(self):
         return "(select block_identifier || '-' || (block_identifier - d.block_identifier) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_id_and_block_identifier"
+
+    # new
+    def storeDPRequests(self, models):
+        keys = models[0].keys
+        sql = f'''INSERT or ignore into dp_requests ({",".join(keys)}) values '''
+        values = []
+        for model in models:
+            items = model.items
+            v = [f"'{items[x]}'" if type(items[x]) == str else str(items[x]) for x in keys]
+            values.append(f'''( {",".join(v)}  )''')
+        sql += ",".join(values)
+        self._curr.execute(sql)
+        self._conn.commit()

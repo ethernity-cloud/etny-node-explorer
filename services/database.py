@@ -142,3 +142,10 @@ class Database:
             self._curr.close()
             self._conn.close()
         except:pass
+
+    # new methods
+    def getLastDPRequest(self):
+        self._curr.execute('SELECT max(dpRequestId) AS lst FROM dp_requests')
+        return self._curr.fetchone()[0]
+
+    

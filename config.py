@@ -12,9 +12,9 @@ from src.exceptions import DatabaseEngineNotFoundError
 try:
     if config['DATABASE']['engine'] != 'MYSQL':
         raise DatabaseEngineNotFoundError('For DB Engine is used Sqlite')
-    from services.mysql_database import MysqlDatabase as Database, dbException
+    from services.mysql_database import MysqlDatabase as Database, dbException, Singleton
 except (ImportError, DatabaseEngineNotFoundError) as e:
-    from services.sqlite_database import SqliteDatabase as Database, dbException
+    from services.sqlite_database import SqliteDatabase as Database, dbException, Singleton
 
 
 
