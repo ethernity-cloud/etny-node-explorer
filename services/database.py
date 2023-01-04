@@ -1,14 +1,18 @@
 
 import time
+from enum import Enum
 
  
 class dbException(Exception):
     pass
 
+DB_TYPES = Enum('DB_TYPES', ['MYSQL', 'SQLITE'])
+
 class Database:
     TABLE_NAME = 'orders'
     _conn, _curr, logger = None, None, None
     queryLogIsEnabled = False
+    ENGINE = ''
 
     dict_cursor = False
     def __init__(self, dict_cursor = False, config = None, logger = None) -> None:
@@ -26,7 +30,7 @@ class Database:
             pass
 
     def init(self) -> None:
-        pass
+        print('init ', self.ENGINE)
 
     def commit(self) -> None:
         self._conn.commit()
@@ -40,7 +44,7 @@ class Database:
 
 
     def insert(self, node = None) -> None:
-        pass
+        print('init ', Database.ENGINE)
 
     def update(self, node):
         public = node.public()
@@ -142,10 +146,5 @@ class Database:
             self._curr.close()
             self._conn.close()
         except:pass
-
-    # new methods
-    def getLastDPRequest(self):
-        self._curr.execute('SELECT max(dpRequestId) AS lst FROM dp_requests')
-        return self._curr.fetchone()[0]
 
     

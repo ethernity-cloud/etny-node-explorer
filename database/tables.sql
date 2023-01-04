@@ -1,7 +1,6 @@
 
-
 -- dpRequest
-drop table if exists dp_requests;
+-- drop table if exists dp_requests;
 create table if not exists dp_requests (
     id bigint(20) unsigned primary key,
     dpRequestId bigint(20) UNIQUE default 0,

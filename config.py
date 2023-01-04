@@ -9,12 +9,16 @@ config = configparser.ConfigParser()
 config.read('config.env')
 
 from src.exceptions import DatabaseEngineNotFoundError
+
 try:
     if config['DATABASE']['engine'] != 'MYSQL':
         raise DatabaseEngineNotFoundError('For DB Engine is used Sqlite')
-    from services.mysql_database import MysqlDatabase as Database, dbException, Singleton
+    from services.mysql_database import MysqlDatabase as Database, dbException, Singleton, DB_TYPES
+    Database.ENGINE = DB_TYPES.MYSQL
 except (ImportError, DatabaseEngineNotFoundError) as e:
-    from services.sqlite_database import SqliteDatabase as Database, dbException, Singleton
+    from services.sqlite_database import SqliteDatabase as Database, dbException, Singleton, DB_TYPES
+    Database.ENGINE = DB_TYPES.SQLITE
+    print(Database.ENGINE)
 
 
 

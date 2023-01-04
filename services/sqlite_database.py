@@ -2,7 +2,7 @@ from socket import timeout
 from datetime import datetime
 import sqlite3, configparser
 from src.singleton import Singleton
-from services.database import Database, time
+from services.database import Database, time, DB_TYPES
 from sqlite3 import OperationalError as dbException
 
 
@@ -24,7 +24,8 @@ class SqliteDatabase(Database, metaclass = Singleton):
         self._curr = self._conn.cursor()
         
 
-    def init(self):
+    def init(self, *args, **kwargs):
+        Database.init(self, *args, **kwargs)
         self._curr.execute(f'''CREATE TABLE IF NOT EXISTS {self.TABLE_NAME} (
                 id bigint(20) primary key, 
                 block_identifier bigint(20) default 0,
@@ -71,7 +72,6 @@ class SqliteDatabase(Database, metaclass = Singleton):
         self._curr.execute(f'''CREATE INDEX if not exists dp_requests_dproc_idx ON  dp_requests (dproc);''')
         self._curr.execute(f'''CREATE INDEX if not exists dp_requests_dpRequestId_idx ON  dp_requests (dpRequestId);''')
         self._curr.execute(f'''CREATE INDEX if not exists dp_requests_createdAt_idx ON  dp_requests (createdAt);''')
-        print('init Sqlite...')
         self._conn.commit()
 
     def insert(self, node, recursion_count = 0):
@@ -129,16 +129,3 @@ class SqliteDatabase(Database, metaclass = Singleton):
         
     def get_concatenated_fields(self):
         return "(select block_identifier || '-' || (block_identifier - d.block_identifier) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_id_and_block_identifier"
-
-    # new
-    def storeDPRequests(self, models):
-        keys = models[0].keys
-        sql = f'''INSERT or ignore into dp_requests ({",".join(keys)}) values '''
-        values = []
-        for model in models:
-            items = model.items
-            v = [f"'{items[x]}'" if type(items[x]) == str else str(items[x]) for x in keys]
-            values.append(f'''( {",".join(v)}  )''')
-        sql += ",".join(values)
-        self._curr.execute(sql)
-        self._conn.commit()

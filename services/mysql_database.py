@@ -1,10 +1,10 @@
 import os, sys, time, pymysql, configparser
 try:
     from src.singleton import Singleton
-    from services.database import Database
+    from services.database import Database, DB_TYPES
 except ImportError:
     from src.singleton import Singleton
-    from database import Database
+    from database import Database, DB_TYPES
 
 from pymysql.err import IntegrityError as dbException
 
@@ -38,7 +38,8 @@ class MysqlDatabase(Database, metaclass = Singleton):
         except pymysql.err.OperationalError as e:
             print(e)
 
-    def init(self):
+    def init(self, *args, **kwargs):
+        Database.init(self, *args, **kwargs)
         self._curr.execute(f'''CREATE TABLE IF NOT EXISTS {self.TABLE_NAME} (
                 id bigint(20) primary key auto_increment, 
                 block_identifier bigint(20) default 0,
@@ -62,8 +63,6 @@ class MysqlDatabase(Database, metaclass = Singleton):
                 FOREIGN KEY (parent_id) REFERENCES {self.TABLE_NAME}(id),
                 index parent_id(parent_id)
             )''')
-
-        print('init MySql...')
 
     def insert(self, node, recursion_call = 0):
         try:
@@ -119,20 +118,6 @@ class MysqlDatabase(Database, metaclass = Singleton):
 
     def get_concatenated_fields(self):
         return "(select concat(block_identifier, '-', (block_identifier - d.block_identifier)) as id_and_block from orders where block_identifier > d.block_identifier order by block_identifier asc limit 1) as next_id_and_block_identifier"
-
-
-    # new
-    def storeDPRequests(self, models):
-        keys = models[0].keys
-        sql = f'''INSERT ignore into dp_requests ({",".join(keys)}) values '''
-        values = []
-        for model in models:
-            items = model.items
-            v = [f"'{items[x]}'" if type(items[x]) == str else str(items[x]) for x in keys]
-            values.append(f'''( {",".join(v)}  )''')
-        sql += ",".join(values)
-        self._curr.execute(sql)
-        self._conn.commit()
 
 
 if __name__ == '__main__':
