@@ -86,49 +86,15 @@ if __name__ == '__main__':
         if stderr:
             print(f'[stderr]\n{stderr}')
 
-    # cmd = f'python3 run/main_proc.py'
-    cmd = f'cd /home/eth/ethernity/staking-reward-service/ && node main.js'
+    cmd = f'python3 run/main.py'
+    # cmd = f'cd /home/eth/ethernity/staking-reward-service/ && node main.js'
 
     t = tester(
         cmd=cmd,
         callback=callback,
-        time_limit=30
+        time_limit=60
     ).run()
 
-    # select count(d.id) from dp_requests d where not exists (select id from dp_requests where id = d.id + 1) and d.id < (select max(id) from dp_requests);
-    # select id + 1 as missing_id from dp_requests d where id > -1 and not exists (select id from dp_requests where id = d.id + 1) and d.id < (select max(id) from dp_requests);
-
-    '''
-        delimiter //
-        drop procedure if exists get_missing_records;
-        CREATE procedure get_missing_records()
-        wholeblock:
-            BEGIN
-                declare str text default '';
-                declare x INT default 1;
-                declare _max INT DEFAULT 0;
-                declare _temporary int default 0;
-                declare _sum int default 0;
-                SET _max = (select max(id) from dp_requests);
-                WHILE x <= _max DO
-                    SET _temporary=(select id from dp_requests where id = x);
-                    if _temporary is null then
-                        SET str = CONCAT(str,x-1,',');
-                        set _sum = _sum + 1;
-                    end if;
-                    SET x = x + 1;
-                END WHILE;
-
-                select concat(_sum, '-',str);
-            END//
-
-        call get_missing_records();
-
-
-
-        truncate dp_requests;
-        select count(*) from dp_requests;
-    '''
 
 
 

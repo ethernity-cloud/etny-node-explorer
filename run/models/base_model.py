@@ -1,19 +1,7 @@
 
-class DPRequestModel:
-    """DPRequestModel"""
-    fields = [
-        'dpRequestId',
-        'dproc',
-        'cpuRequest',
-        'memoryRequest',
-        'storageRequest',
-        'bandwidthRequest',
-        'duration',
-        'minPrice',
-        'status',
-        'createdAt',
-    ]
-
+from datetime import datetime
+class BaseModel:
+    fields = []
     def __init__(self, arr) -> None:
         for index, key in enumerate(self.fields):
             try:
@@ -23,11 +11,18 @@ class DPRequestModel:
         self.id = self.dpRequestId + 1 # pylint: disable=no-member,invalid-name
 
     @property
-    def keys(self):
-        """property keys"""
-        return ['id', *self.fields]
+    def keys(self) -> list:
+        return list(set(['id', *self.fields]))
 
     @property
     def items(self) -> dict:
-        """property items"""
         return {x: getattr(self, x) for x in dir(self) if x in ['id', *self.fields]}
+
+    def getAttr(self, row):
+        value = getattr(self, row)
+        try:
+            if row in ['updated_at', 'createdAt'] and value:
+                return datetime.fromtimestamp(value).isoformat()
+            raise Exception
+        except Exception:
+            return value

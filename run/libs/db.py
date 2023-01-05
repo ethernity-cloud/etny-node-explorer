@@ -1,19 +1,19 @@
 import os
 import sys
-# pylint: disable=wrong-import-position, import-error
 sys.path.extend([os.getcwd().split('/run')[0]])
 from config import Database, DB_TYPES
 
 class DB(Database):
-    """db class"""
         
     def get_last_dp_request(self):
-        """get_last_dp_request"""
         self._curr.execute('SELECT max(dpRequestId) AS lst FROM dp_requests')
         return self._curr.fetchone()[0]
 
+    def get_count_of_dp_requests(self):
+        self._curr.execute('SELECT count(dpRequestId) AS lst FROM dp_requests')
+        return self._curr.fetchone()[0]
+
     def store_dp_requests(self, models):
-        """store_dp_requests"""
         keys = models[0].keys
         sql = "INSERT "
         if self.ENGINE == DB_TYPES.SQLITE:
@@ -28,8 +28,17 @@ class DB(Database):
         self._curr.execute(sql)
         self._conn.commit()
 
-    def get_missing_records(self, last_page = 1, per_page = 10):
-        """get missing records"""
-        self._curr.execute(f'select get_missing_records({last_page}, {per_page})')
+    def get_missing_records_count(self):
+        self._curr.execute('select get_missing_records_count()')
         return self._curr.fetchone()[0]
+
+    def generate_unique_requests(self):
+        self._curr.execute('call group_by_dp_requests()')
+        self._conn.commit()
+
+    def get_unique_requests(self):
+        self._curr.execute('SELECT * from dp_unique_requests')
+        return self._curr.fetchall()
+        
+
         

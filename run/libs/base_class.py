@@ -1,5 +1,4 @@
-# pylint: disable=wrong-import-position, import-error,ungrouped-imports, unused-import
-import time
+# pylint: disable=unused-import,ungrouped-imports
 import sys
 import os 
 from web3 import Web3, __version__ as web3_version
@@ -29,17 +28,14 @@ class BaseClass:
         self.etnyContract = contract if contract else self._get_etny_contract()
         
     def _get_etny_contract(self):
-        """_get_etnyContract"""
         return self._w3.eth.contract(address=self._contract, abi=self._get_contract_abi())
 
     def _get_contract_abi(self) -> str:
-        """_get_contract_abi"""
         try:
             with open(os.path.dirname(os.path.realpath(__file__)) + '/../../etnyContract.abi') as r: # pylint: disable=unspecified-encoding
                 return r.read()
-        except Exception: # pylint: disable=broad-except
+        except Exception:
             return None
 
     def run(self):
-        """run"""
         pass
