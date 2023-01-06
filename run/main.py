@@ -5,15 +5,12 @@ import time
 import traceback
 from math import ceil
 from multiprocessing import Process, Queue
-sys.path.extend([os.getcwd().split('/run')[0]])
 
-from libs.base_class import BaseClass, config, getLogger, Singleton
-from libs.db import DB
+from libs.base_class import BaseClass, config, Singleton, Database
 from models.dp_request_model import DPRequestModel
 from libs.exceptions import ContinueFromLoopException, LastIterationException # pylint: disable=no-name-in-module
 from libs.generate_doc import CSVFileGenerator
 
-logger = getLogger()
 PROCESS_COUNT = 30
 
 def signal_handler(sig, frame): # pylint: disable=unused-argument,redefined-outer-name
@@ -80,21 +77,25 @@ class GetDPRequests(BaseClass):
     current_dots_count = -1
     def __init__(self) -> None:
         self._baseConfig()
-        DB(config=config, logger = logger).init()
+        Database(config=config).init()
 
         self.init()
 
     def init(self):
-        last_local_id = DB().get_last_dp_request()
+        last_local_id = Database().get_last_dp_request()
         print('last_local_id = ', last_local_id)
 
+        # print(Database().get_missing_records_count())
+        # print(Database().get_missing_records(last_page=3868, per_page=10))
+        # Database().generate_unique_requests()
+        # CSVFileGenerator()
+        # return
         self.display_percent()
         self.start(start_point=last_local_id if last_local_id else 0)
-        
 
     @staticmethod
     def store(models):
-        DB().store_dp_requests(models = models)
+        Database().store_dp_requests(models = models)
 
     def kill_proceses(self, task_queue, done_queue, jobs):
         try:
@@ -180,7 +181,7 @@ class GetDPRequests(BaseClass):
     def get_missing_records(self, last_page = 1, per_page = 30, task_queue = None, done_queue = None, jobs = None):
         try:
             try:
-                group_args = DB().get_missing_records(last_page=last_page, per_page=per_page).split('-')
+                group_args = Database().get_missing_records(last_page=last_page, per_page=per_page).split('-')
                 for key, var in enumerate(group_args):
                     try:
                         group_args[key] = int(var)
@@ -188,18 +189,25 @@ class GetDPRequests(BaseClass):
                         pass
                 count, current_iter, _max, items = group_args    
                 if count == 0:
-                    time.sleep(5)
-                    raise LastIterationException(f'count = {count}')
+                    time.sleep(1)
+                    raise ValueError
             except ValueError as ex:
                 raise LastIterationException(ex)
+            except AttributeError:
+                count = Database().get_missing_records_count()
+                print('error here, last _page = ', last_page)
+                if count:
+                    return self.get_missing_records(last_page=1)
+                raise LastIterationException(f'count = 0')
+            
 
             items = list(filter(lambda x: x, items.split(',')))
-            print(f'''\n
-                count = {count} - {type(count)}, 
-                current_iter = {current_iter} - {type(current_iter)}, 
-                _max = {_max} - {type(_max)}, 
-                items = {items} - {type(items)}
-            ''')
+            # print(f'''\n
+            #     count = {count} - {type(count)}, 
+            #     current_iter = {current_iter} - {type(current_iter)}, 
+            #     _max = {_max} - {type(_max)}, 
+            #     items = {items} - {type(items)}
+            # ''')
             if not task_queue:
                 [task_queue, done_queue, jobs] = self.open_queue(
                     process_call=InProcess(contract=self.etnyContract, w3=self._w3).run_for_missing_items,
@@ -224,16 +232,16 @@ class GetDPRequests(BaseClass):
     def display_percent(self):
         try:
             max_id = self.etnyContract.caller()._getDPRequestsCount() # pylint: disable=protected-access
-            currentMax = DB().get_count_of_dp_requests()
+            currentMax = Database().get_count_of_dp_requests()
             percent = ceil((currentMax / max_id) * 100) if currentMax else 0
-            message = f"Progress: {percent}%. Please wait"
-            if GetDPRequests.current_dots_count > 2:
+            message = f"Progress: {percent if (max_id - currentMax < 1000) else (percent - 1 if percent else 0)}%. Please wait"
+            if GetDPRequests.current_dots_count >= 2:
                 GetDPRequests.current_dots_count = -1
             GetDPRequests.current_dots_count += 1
             sys.stdout.write(f"\r{message}{''.join(map(lambda x: '.', list(range(GetDPRequests.current_dots_count)))) }")
             sys.stdout.flush()
-        except Exception as ex:
-            print('ex = ', ex)
+        except Exception:
+            pass
         
 
 if __name__ == '__main__':

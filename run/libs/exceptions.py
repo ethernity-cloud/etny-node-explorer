@@ -1,4 +1,5 @@
-
+class DatabaseEngineNotFoundError(Exception):
+    pass
 
 class ContinueFromLoopException(Exception):
     pass
