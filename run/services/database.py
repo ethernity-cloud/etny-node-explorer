@@ -69,3 +69,6 @@ class Database:
     def get_unique_requests(self):
         self._curr.execute('SELECT * from dp_unique_requests')
         return self._curr.fetchall()
+
+    def get_unique_requests_count(self, interval_hours = 24):
+        pass

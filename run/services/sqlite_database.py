@@ -96,3 +96,8 @@ class SqliteDatabase(Database, metaclass = Singleton):
         '''
         self._curr.execute(sql)
         self._conn.commit()
+
+    def get_unique_requests_count(self, interval_hours = 24):
+        super().get_count_of_dp_requests()
+        self._curr.execute(f"select count(distinct dproc) from dp_requests where createdAt >= cast(strftime('%s', datetime('now', '-{interval_hours} hour')) as integer)")
+        return self._curr.fetchone()[0]

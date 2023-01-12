@@ -32,7 +32,7 @@ create procedure if not exists group_by_dp_requests()
             local_created_at,
             max(createdAt) as updated_at,
             count(id) as nodes_count
-         from dp_requests group by dproc
+         from dp_requests group by dproc order by createdAt desc
             ON DUPLICATE KEY UPDATE
                 id = values(id),
                 dpRequestId = values(dpRequestId),

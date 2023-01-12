@@ -13,15 +13,18 @@ class CSVFileGenerator:
             os.mkdir(os.path.join(os.getcwd(), 'documents'))
         Database().connect()
         Database().generate_unique_requests()
+        _iter = 0
         with open(self._nodesFile, 'w', newline='') as output_file: # pylint: disable=unspecified-encoding
             writer = csv.writer(output_file, dialect="excel-tab")
             writer.writerow(DPUniqueRequestModel.fields)
-            _iter = 0
-            data = map(DPUniqueRequestModel, Database().get_unique_requests()[:10])
+            data = map(DPUniqueRequestModel, Database().get_unique_requests())
             for node in data:
                 writer.writerow([node.getAttr(x) for x in node.fields])
                 _iter += 1
-            print(f'''\n\nThe file "{fileName}" with {_iter} records was created. ''')
+            print(f'''\n\nThe file "{fileName}" was created. ''')
+        last_nodes_count = Database().get_unique_requests_count()
+        print('-' * 10)
+        print(f"total nodes number: {_iter}, active nodes: {last_nodes_count}")
 
 if __name__ == '__main__':
     CSVFileGenerator()

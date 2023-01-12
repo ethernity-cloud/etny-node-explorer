@@ -224,9 +224,8 @@ class GetDPRequests(BaseClass):
 
         except LastIterationException:
             self.kill_proceses(task_queue=task_queue, done_queue=done_queue, jobs=jobs)
-            print('generate unique requests...')
+            print('\ngenerate unique requests...')
             CSVFileGenerator()
-            print('endof....')
 
 
     def display_percent(self):

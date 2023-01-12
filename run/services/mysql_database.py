@@ -39,3 +39,8 @@ class MysqlDatabase(Database, metaclass = Singleton):
     def generate_unique_requests(self):
         self._curr.execute('call group_by_dp_requests()')
         self._conn.commit()
+
+    def get_unique_requests_count(self, interval_hours = 24):
+        super().get_count_of_dp_requests()
+        self._curr.execute(f"select count(distinct dproc) from dp_requests where createdAt >= unix_timestamp(now() - interval {interval_hours} hour)")
+        return self._curr.fetchone()[0]
