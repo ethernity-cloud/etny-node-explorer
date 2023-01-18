@@ -214,7 +214,7 @@ class GetDPRequests(BaseClass):
                 done_queue=done_queue,
                 loop_iteration=items,
                 loop_iters_count = PROCESS_COUNT,
-                callback=(lambda : self.get_missing_records(
+                callback=(lambda : self.searching_for_missing_nodes(
                     last_page=current_iter, 
                     task_queue=task_queue, 
                     done_queue=done_queue, 
