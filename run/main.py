@@ -173,11 +173,7 @@ class GetDPRequests(BaseClass):
 
         self.searching_for_missing_nodes()
 
-    
-    def searching_for_missing_nodes(self):
-        return self.get_missing_records()
-
-    def get_missing_records(self, last_page = 1, per_page = 30, task_queue = None, done_queue = None, jobs = None):
+    def searching_for_missing_nodes(self, last_page = 1, per_page = 30, task_queue = None, done_queue = None, jobs = None):
         try:
             try:
                 group_args = Database().get_missing_records(last_page=last_page, per_page=per_page).split('-')
