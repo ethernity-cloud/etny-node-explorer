@@ -136,3 +136,5 @@ dmypy.json
 *.csv
 *.log.*
 *db-journal
+
+.idea/
