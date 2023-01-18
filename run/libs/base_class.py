@@ -2,6 +2,7 @@
 import sys
 import os 
 from web3 import Web3, __version__ as web3_version
+from web3.exceptions import ABIFunctionNotFound
 from packaging import version
 from web3.middleware import geth_poa_middleware
 from config import config, Singleton, Database

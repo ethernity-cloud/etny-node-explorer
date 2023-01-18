@@ -6,7 +6,7 @@ import traceback
 from math import ceil
 from multiprocessing import Process, Queue
 
-from libs.base_class import BaseClass, config, Singleton, Database
+from libs.base_class import BaseClass, config, Singleton, Database, ABIFunctionNotFound # pylint: disable=no-name-in-module
 from models.dp_request_model import DPRequestModel
 from libs.exceptions import ContinueFromLoopException, LastIterationException # pylint: disable=no-name-in-module
 from libs.generate_doc import CSVFileGenerator
@@ -23,14 +23,20 @@ for sig in [signal.SIGINT, signal.SIGTERM]:
     signal.signal(sig, signal_handler)
 
 class InProcess(BaseClass, metaclass = Singleton):
-    def __init__(self, w3 = None, contract = None) -> None:
+    def __init__(self,  w3 = None, contract = None, parent_process_id = None) -> None:
         super().__init__()
+        self.parent_process_id = parent_process_id
         self._baseConfig(w3 = w3, contract=contract)
 
     def run_action(self, i, _input, output, _max = 0, _iter_count = 0):
         try:
             item = self.etnyContract.functions._getDPRequestWithCreationDate(i).call() # pylint: disable=protected-access
             output.put(DPRequestModel([i, *item]))
+        except ABIFunctionNotFound as err:
+            method_name = str(err).split('The function')[1].split('was')[0].strip()
+            print(f'\nabi method {method_name} was not found! ', self.parent_process_id)
+            os.killpg(self.parent_process_id, signal.SIGTERM)
+            sys.exit(0)
         except Exception as err:
             if 'Connection aborted' in str(err) and _iter_count < PROCESS_COUNT:
                 time.sleep(1)
@@ -160,7 +166,7 @@ class GetDPRequests(BaseClass):
         _max = _total
         loop_iteration = range(start_point, _max + 1, PROCESS_COUNT)
         [task_queue, done_queue, jobs] = self.open_queue(
-            process_call=InProcess(contract=self.etnyContract, w3=self._w3).run, 
+            process_call=InProcess(contract=self.etnyContract, w3=self._w3, parent_process_id = os.getpid()).run, 
             _max = _max
         )
         self.run_action(
@@ -205,7 +211,7 @@ class GetDPRequests(BaseClass):
             # ''')
             if not task_queue:
                 [task_queue, done_queue, jobs] = self.open_queue(
-                    process_call=InProcess(contract=self.etnyContract, w3=self._w3).run_for_missing_items,
+                    process_call=InProcess(contract=self.etnyContract, w3=self._w3, parent_process_id = os.getpid()).run_for_missing_items,
                     _max = _max
                 )
             self.display_percent()
