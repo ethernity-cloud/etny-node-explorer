@@ -85,11 +85,6 @@ class GetDPRequests(BaseClass):
         last_local_id = Database().get_last_dp_request()
         print('last_local_id = ', last_local_id)
 
-        # print(Database().get_missing_records_count())
-        # print(Database().get_missing_records(last_page=3868, per_page=10))
-        # Database().generate_unique_requests()
-        # CSVFileGenerator()
-        # return
         self.display_percent()
         self.start(start_point=last_local_id if last_local_id else 0)
 
@@ -176,7 +171,11 @@ class GetDPRequests(BaseClass):
             callback=(lambda: self.kill_proceses(task_queue=task_queue, done_queue=done_queue, jobs=jobs))
         )
 
-        self.get_missing_records()
+        self.searching_for_missing_nodes()
+
+    
+    def searching_for_missing_nodes(self):
+        return self.get_missing_records()
 
     def get_missing_records(self, last_page = 1, per_page = 30, task_queue = None, done_queue = None, jobs = None):
         try:
@@ -197,7 +196,7 @@ class GetDPRequests(BaseClass):
                 count = Database().get_missing_records_count()
                 print('error here, last _page = ', last_page)
                 if count:
-                    return self.get_missing_records(last_page=1)
+                    return self.searching_for_missing_nodes()
                 raise LastIterationException(f'count = 0')
             
 
@@ -219,7 +218,12 @@ class GetDPRequests(BaseClass):
                 done_queue=done_queue,
                 loop_iteration=items,
                 loop_iters_count = PROCESS_COUNT,
-                callback=(lambda : self.get_missing_records(last_page=current_iter, task_queue=task_queue, done_queue=done_queue, jobs=jobs))
+                callback=(lambda : self.get_missing_records(
+                    last_page=current_iter, 
+                    task_queue=task_queue, 
+                    done_queue=done_queue, 
+                    jobs=jobs
+                ))
             )
 
         except LastIterationException:

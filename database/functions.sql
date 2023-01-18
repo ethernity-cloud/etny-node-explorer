@@ -20,7 +20,7 @@ CREATE function get_missing_records(last_id mediumint(3), per_page mediumint(3) 
         declare current_iter INT DEFAULT (if(last_id > 1,last_id + 2, last_id));
         
         SET _max = (select max(id) from dp_requests);
-        
+
         WHILE current_iter < _max and fount_items < per_page
             DO
                 SET inline_query=(select id from dp_requests where id = current_iter);
