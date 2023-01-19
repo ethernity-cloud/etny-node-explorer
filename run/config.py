@@ -14,7 +14,7 @@ try:
         raise DatabaseEngineNotFoundError('For DB Engine is used Sqlite')
     from services.mysql_database import MysqlDatabase as Database, DB_TYPES, Singleton
     Database.ENGINE = DB_TYPES.MYSQL
-except (ImportError, DatabaseEngineNotFoundError) as e:
+except (ImportError, DatabaseEngineNotFoundError):
     from services.sqlite_database import SqliteDatabase as Database, DB_TYPES, Singleton
     Database.ENGINE = DB_TYPES.SQLITE
     print(Database.ENGINE)
