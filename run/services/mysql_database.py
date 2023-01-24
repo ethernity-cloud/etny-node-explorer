@@ -1,4 +1,4 @@
-import pymysql, configparser
+import pymysql, configparser, sys
 try:
     from services.database import Singleton, Database, DB_TYPES
 except ImportError:
@@ -24,8 +24,9 @@ class MysqlDatabase(Database, metaclass = Singleton):
 
             self._curr = self._conn.cursor()     
 
-        except pymysql.err.OperationalError as ex:
-            print(ex)
+        except pymysql.err.OperationalError:
+            print('Please Call: "sudo ./create_mysql_database.sh" first ')
+            sys.exit()
 
 
     def get_missing_records_count(self):
