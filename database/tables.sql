@@ -15,7 +15,7 @@ create table if not exists dp_requests (
 
     createdAt int(11) not null default 0,
     -- local dates
-    local_created_at int(11) not null default unix_timestamp(),
+    local_created_at int(11) unsigned not null default (cast(unix_timestamp() as unsigned)),
 
     index dp_requests_dproc_idx(dproc),
     index dp_requests_dpRequestId_idx(dpRequestId),
@@ -37,7 +37,7 @@ create table if not exists dp_unique_requests (
 
     createdAt int(11) not null default 0,
     -- local dates
-    local_created_at int(11) not null default unix_timestamp(),
+    local_created_at int(11) unsigned not null default (cast(unix_timestamp() as unsigned)),
     updated_at int(11) not null default 0,
     nodes_count mediumint unsigned default 0,
 
