@@ -32,7 +32,7 @@ class BaseClass:
 
     def _get_contract_abi(self) -> str:
         try:
-            with open(os.path.dirname(os.path.realpath(__file__)) + '/../../etnyContract.abi') as r: # pylint: disable=unspecified-encoding
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/../etnyContract.abi') as r: # pylint: disable=unspecified-encoding
                 return r.read()
         except Exception:
             return None
