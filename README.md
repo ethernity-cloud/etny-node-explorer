@@ -17,7 +17,7 @@ sudo apt install python3 python3-pip
 pip3 install -r mysql_requirements.txt
 
 # for sqlite version
-pip3 install sqlite_requirements.txt
+pip3 install -r sqlite_requirements.txt
 
 git clone https://github.com/ethernity-cloud/etny-node-explorer
 ```
@@ -44,11 +44,7 @@ IndexFile = data.json
 CSVFile = nodes.csv
 ```
 
-*data.json* - Data dictionary with request ids and data processing request containing block number <br />
-
-*nodes.csv* - Output of the script with the details of the nodes interacting with the smart contract <br />
-
-*nodes.csv* - Column details <br />
+Generated *.csv file`s - Column details <br />
 
 | Column 01  | Column 02 | Column 03 | Column 04 | Column 05 | Column 06 | Column 07 | Column 08 | Column 09 | Column 10 |Column 11|
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |

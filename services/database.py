@@ -57,6 +57,15 @@ class Database:
         self._curr.execute(sql)
         self._conn.commit()
 
+    def fetch_one(self, query: str, default_value = 0):
+        self._curr.execute(query)
+        result = self._curr.fetchone()
+        return result[0] if result else default_value
+
+    def fetch_all(self, query: str):
+        self._curr.execute(query)
+        return self._curr.fetchall()
+
     def get_missing_records_count(self):
         pass
 
@@ -67,8 +76,7 @@ class Database:
         pass
 
     def get_unique_requests(self):
-        self._curr.execute('SELECT * from dp_unique_requests')
-        return self._curr.fetchall()
+        return self.fetch_all('SELECT * from dp_unique_requests')
 
     def get_unique_requests_count(self, interval_hours = 24):
         pass

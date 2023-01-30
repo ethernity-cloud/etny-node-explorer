@@ -35,3 +35,13 @@ CREATE function get_missing_records(last_id mediumint(3), per_page mediumint(3) 
 
         return concat(fount_items,'-',current_iter,'-',_max,'-',str);
     END//
+
+
+delimiter //
+drop function if exists get_yesterday_timestamp;
+CREATE function get_yesterday_timestamp() returns BIGINT
+    BEGIN
+        declare yesterday bigint default 0;
+        set yesterday = (select (now() - interval ((cast( date_format(now(), "%H") as integer) * 60) + cast( date_format(now(), "%i") as integer ) ) minute) );
+        return unix_timestamp(concat(date_format(yesterday, '%Y-%m-%d %H:%i'), ':00'));
+    END//
