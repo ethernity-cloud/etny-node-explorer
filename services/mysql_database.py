@@ -42,7 +42,6 @@ class MysqlDatabase(Database, metaclass = Singleton):
     def get_yesterday(self):
         return self.fetch_one("select get_yesterday_timestamp()")
 
-    def get_unique_requests_count(self, interval_hours = 24):
+    def get_unique_requests_count(self):
         super().get_count_of_dp_requests()
-        yesterday = self.get_yesterday()
-        return self.fetch_one(f"select count(distinct dproc) from dp_requests where ( createdAt <= {yesterday} and createdAt >= unix_timestamp(from_unixtime({yesterday}) - interval {interval_hours} hour) )")
+        return self.fetch_one(f"select count(distinct dproc) from dp_requests where date(from_unixtime(createdAt)) = ( current_date - interval 1 day )")
