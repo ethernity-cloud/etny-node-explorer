@@ -1,3 +1,5 @@
+-- for-windows
+
 delimiter //
 drop procedure if exists group_by_dp_requests;
 create procedure if not exists group_by_dp_requests()

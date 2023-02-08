@@ -1,6 +1,6 @@
 import pymysql, configparser, sys
 try:
-    from services.database import Singleton, Database, DB_TYPES
+    from services.database import Singleton, Database, DB_TYPES, IS_WINDOWS
 except ImportError:
     from database import Singleton, Database, DB_TYPES
 
@@ -25,7 +25,10 @@ class MysqlDatabase(Database, metaclass = Singleton):
             self._curr = self._conn.cursor()     
 
         except pymysql.err.OperationalError:
-            print('Please Call: "sudo ./create_mysql_database.sh" first ')
+            if IS_WINDOWS:
+                print("Please Run docker first")
+            else:
+                print('Please Call: "sudo ./create_mysql_database.sh" first ')
             sys.exit()
 
 

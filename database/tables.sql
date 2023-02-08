@@ -1,3 +1,4 @@
+-- for-windows
 
 -- dpRequest
 -- drop table if exists dp_requests;

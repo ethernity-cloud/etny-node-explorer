@@ -4,20 +4,34 @@ import signal
 import time
 import traceback
 from math import ceil
-from multiprocessing import Process, Queue
 
-from libs.base_class import BaseClass, config, Singleton, Database, ABIFunctionNotFound # pylint: disable=no-name-in-module
+from libs.base_class import BaseClass, IS_WINDOWS, config, Singleton, Database, ABIFunctionNotFound # pylint: disable=no-name-in-module
 from models.dp_request_model import DPRequestModel
 from libs.exceptions import ContinueFromLoopException, LastIterationException # pylint: disable=no-name-in-module
 from libs.generate_doc import CSVFileGenerator
 
 PROCESS_COUNT = 30
 
+if IS_WINDOWS:
+    from threading import Thread as Process
+    from _thread import interrupt_main
+    from queue import Queue
+    THREAD_DEAMON = True
+else:
+    from multiprocessing import Process, Queue
+    THREAD_DEAMON = False
+
 def signal_handler(sig, frame): # pylint: disable=unused-argument,redefined-outer-name
     if len(GetDPRequests.results) > 0:
         print('resultsLen = ', len(GetDPRequests.results))
         GetDPRequests.store(models = GetDPRequests.results)
-    sys.exit() 
+    if IS_WINDOWS:
+        try:
+            interrupt_main()
+            os._exit()
+        except:
+            pass
+    sys.exit()
 
 for sig in [signal.SIGINT, signal.SIGTERM]:
     signal.signal(sig, signal_handler)
@@ -35,7 +49,10 @@ class InProcess(BaseClass, metaclass = Singleton):
         except ABIFunctionNotFound as err:
             method_name = str(err).split('The function')[1].split('was')[0].strip()
             print(f'\nabi method {method_name} was not found! ', self.parent_process_id)
-            os.killpg(self.parent_process_id, signal.SIGTERM)
+            if IS_WINDOWS:
+                os.kill(os.getpid(), signal.SIGTERM)
+            else:
+                os.killpg(self.parent_process_id, signal.SIGTERM)
             sys.exit(0)
         except Exception as err:
             if 'Connection aborted' in str(err) and _iter_count < PROCESS_COUNT:
@@ -113,6 +130,7 @@ class GetDPRequests(BaseClass):
         jobs = []
         for _ in range(PROCESS_COUNT):
             process = Process(target=process_call, args=(task_queue, done_queue, _max))
+            process.daemon = THREAD_DEAMON
             jobs.append(process)
             process.start()
 
