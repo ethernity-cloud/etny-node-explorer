@@ -75,6 +75,8 @@ class SqliteDatabase(Database, metaclass = Singleton):
 
     def get_missing_records(self, last_page = 1, per_page = 10):
         _max = self.get_last_dp_request(field='id')
+        if _max == None:
+            _max = 0
         _str = ''
         inline_query = 0
         fount_items = 0

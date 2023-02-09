@@ -4,15 +4,16 @@ import signal
 import time
 import traceback
 from math import ceil
+from typing import Union
 
-from libs.base_class import BaseClass, IS_WINDOWS, config, Singleton, Database, ABIFunctionNotFound # pylint: disable=no-name-in-module
+from libs.base_class import BaseClass, IS_NOT_LINUX, config, Singleton, Database, ABIFunctionNotFound # pylint: disable=no-name-in-module
 from models.dp_request_model import DPRequestModel
 from libs.exceptions import ContinueFromLoopException, LastIterationException # pylint: disable=no-name-in-module
 from libs.generate_doc import CSVFileGenerator
 
 PROCESS_COUNT = 30
 
-if IS_WINDOWS:
+if IS_NOT_LINUX:
     from threading import Thread as Process
     from _thread import interrupt_main
     from queue import Queue
@@ -25,7 +26,7 @@ def signal_handler(sig, frame): # pylint: disable=unused-argument,redefined-oute
     if len(GetDPRequests.results) > 0:
         print('resultsLen = ', len(GetDPRequests.results))
         GetDPRequests.store(models = GetDPRequests.results)
-    if IS_WINDOWS:
+    if IS_NOT_LINUX:
         try:
             interrupt_main()
             os._exit()
@@ -49,7 +50,7 @@ class InProcess(BaseClass, metaclass = Singleton):
         except ABIFunctionNotFound as err:
             method_name = str(err).split('The function')[1].split('was')[0].strip()
             print(f'\nabi method {method_name} was not found! ', self.parent_process_id)
-            if IS_WINDOWS:
+            if IS_NOT_LINUX:
                 os.kill(os.getpid(), signal.SIGTERM)
             else:
                 os.killpg(self.parent_process_id, signal.SIGTERM)
@@ -98,15 +99,56 @@ class InProcess(BaseClass, metaclass = Singleton):
 class GetDPRequests(BaseClass):
     results = []
     current_dots_count = -1
+    last_page_for_missing_records = 1
     def __init__(self) -> None:
         self._baseConfig()
         Database(config=config).init()
 
         self.init()
 
-    def init(self):
+    @property
+    def _get_max_block_number(self):
+        try:
+            return self._w3.eth.get_block('latest')['number']
+        except Exception as ex:
+            print("Can`t get block number, ", ex)
+            sys.exit()
+
+    @property
+    def last_local_id(self) -> Union[int, None]:
+  
+        try:
+            hours_back = int(config['DEFAULT'].get('HOURS_BACK', 24))
+            average_block_time_in_seconds = float(config['DEFAULT'].get('AVERAGE_BLOCK_TIME_IN_SECONDS', 6.5))
+            start_from_zero = bool(False if config['DEFAULT'].get('START_FROM_ZERO', 'False').lower() == 'false' else True)
+        except Exception as ex:
+            print('ex = ', ex)
+            sys.exit(0)
+        
         last_local_id = Database().get_last_dp_request()
-        print('last_local_id = ', last_local_id)
+        
+        # when need to start from scratch
+        if start_from_zero and last_local_id == None:
+            return 0
+
+        # compute last local id in relation to average block time in second 
+        if last_local_id == None and not start_from_zero:
+            nodes_back = int((hours_back * 60 * 60) // average_block_time_in_seconds)
+            starting_block = int(self._get_max_block_number - nodes_back)
+            last_local_id =  self._max_id(starting_block=starting_block)
+            self.last_page_for_missing_records = last_local_id
+
+        return last_local_id
+
+    def _max_id(self, starting_block = 0):
+        if starting_block == 0:
+            return self.etnyContract.functions._getDPRequestsCount().call() # pylint: disable=protected-access
+        return self.etnyContract.functions._getDPRequestsCount().call(block_identifier=starting_block) # pylint: disable=protected-access
+
+
+    def init(self):
+        last_local_id = self.last_local_id
+        print('self.last_local_id = ', last_local_id, self.last_page_for_missing_records)
 
         self.display_percent()
         self.start(start_point=last_local_id if last_local_id else 0)
@@ -180,7 +222,7 @@ class GetDPRequests(BaseClass):
             print(traceback.format_exc(), type(ex))
 
     def start(self, total = 0, start_point = 0) -> None:
-        _total = total if total else self.etnyContract.functions._getDPRequestsCount().call() # pylint: disable=protected-access
+        _total = total if total else self._max_id()
         _max = _total
         loop_iteration = range(start_point, _max + 1, PROCESS_COUNT)
         [task_queue, done_queue, jobs] = self.open_queue(
@@ -195,12 +237,16 @@ class GetDPRequests(BaseClass):
             callback=(lambda: self.kill_proceses(task_queue=task_queue, done_queue=done_queue, jobs=jobs))
         )
 
-        self.searching_for_missing_nodes()
+        self.searching_for_missing_nodes(last_page=self.last_page_for_missing_records)
 
     def searching_for_missing_nodes(self, last_page = 1, per_page = 30, task_queue = None, done_queue = None, jobs = None):
         try:
             try:
-                group_args = Database().get_missing_records(last_page=last_page, per_page=per_page).split('-')
+                group_args = Database().get_missing_records(last_page=last_page, per_page=per_page)
+                if group_args == None:
+                    return
+                group_args = group_args.split('-')
+                
                 for key, var in enumerate(group_args):
                     try:
                         group_args[key] = int(var)
@@ -212,18 +258,18 @@ class GetDPRequests(BaseClass):
                     raise ValueError
             except ValueError as ex:
                 raise LastIterationException(ex)
-            except AttributeError:
+            except AttributeError as ex:
                 count = Database().get_missing_records_count()
                 print('error here, last _page = ', last_page)
                 if count:
                     return self.searching_for_missing_nodes()
                 raise LastIterationException(f'count = 0')
             
-
             items = list(filter(lambda x: x, items.split(',')))
             # print(f'''\n
             #     count = {count} - {type(count)}, 
             #     current_iter = {current_iter} - {type(current_iter)}, 
+            #     last_page = {last_page},
             #     _max = {_max} - {type(_max)}, 
             #     items = {items} - {type(items)}
             # ''')
@@ -254,7 +300,7 @@ class GetDPRequests(BaseClass):
 
     def display_percent(self):
         try:
-            max_id = self.etnyContract.caller()._getDPRequestsCount() # pylint: disable=protected-access
+            max_id = self._max_id() # pylint: disable=protected-access
             currentMax = Database().get_count_of_dp_requests()
             percent = ceil((currentMax / max_id) * 100) if currentMax else 0
             message = f"Progress: {percent if (max_id - currentMax < 1000) else (percent - 1 if percent else 0)}%. Please wait"
