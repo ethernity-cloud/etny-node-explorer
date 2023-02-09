@@ -1,7 +1,7 @@
 from enum import Enum
 import os, sys
 
-IS_WINDOWS = sys.platform.startswith('win') or 'windows_nt' in os.environ.get('OS').lower()
+IS_NOT_LINUX = sys.platform.startswith('win') or 'windows_nt' in os.environ.get('OS', '').lower() or 'darwin' in os.environ.get('OS', '').lower()
 DB_TYPES = Enum('DB_TYPES', ['MYSQL', 'SQLITE'])
 
 class Singleton(type):

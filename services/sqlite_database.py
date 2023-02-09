@@ -1,6 +1,6 @@
 import sqlite3, configparser
 try:
-    from services.database import Singleton, Database, DB_TYPES, IS_WINDOWS
+    from services.database import Singleton, Database, DB_TYPES, IS_NOT_LINUX
 except ImportError:
     from database import Singleton, Database, DB_TYPES
 
