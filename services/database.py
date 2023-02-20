@@ -1,27 +1,33 @@
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import os, sys
 
-IS_NOT_LINUX = sys.platform.startswith('win') or 'windows_nt' in os.environ.get('OS', '').lower() or 'darwin' in os.environ.get('OS', '').lower()
+IS_NOT_LINUX = sys.platform.startswith('win') or 'windows_nt' in os.environ.get('OS',
+                                                                                '').lower() or 'darwin' in os.environ.get(
+    'OS', '').lower() or sys.platform.startswith('darwin')
 DB_TYPES = Enum('DB_TYPES', ['MYSQL', 'SQLITE'])
+
 
 class Singleton(type):
     _instances = {}
+
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
             cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
 
+
 class Database:
     _conn, _curr = None, None
     ENGINE = ''
 
-    def __init__(self, config = None) -> None:
+    def __init__(self, config=None) -> None:
         self.connect(config=config)
 
     def init(self) -> None:
         print('init ', self.ENGINE)
 
-    def connect(self, config = None):
+    def connect(self, config=None):
         pass
 
     def commit(self) -> None:
@@ -31,17 +37,21 @@ class Database:
         try:
             self._curr.close()
             self._conn.close()
-        except: # pylint: disable=bare-except
+        except:  # pylint: disable=bare-except
             pass
 
     # - shared methods
 
-    def get_last_dp_request(self, field = 'dpRequestId'):
+    def get_last_dp_request(self, field='dpRequestId'):
         self._curr.execute(f'SELECT max({field}) FROM dp_requests')
         return self._curr.fetchone()[0]
 
     def get_count_of_dp_requests(self):
         self._curr.execute('SELECT count(dpRequestId) FROM dp_requests')
+        return self._curr.fetchone()[0]
+
+    def get_min_dp_request_id(self):
+        self._curr.execute('SELECT min(dpRequestId) FROM dp_requests')
         return self._curr.fetchone()[0]
 
     def store_dp_requests(self, models):
@@ -53,13 +63,14 @@ class Database:
         values = []
         for model in models:
             items = model.items
-            v = [f"'{items[x]}'" if type(items[x]) == str else str(items[x]) for x in keys] # pylint: disable=unidiomatic-typecheck, invalid-name
+            v = [f"'{items[x]}'" if type(items[x]) == str else str(items[x]) for x in
+                 keys]  # pylint: disable=unidiomatic-typecheck, invalid-name
             values.append(f'''( {",".join(v)}  )''')
         sql += ",".join(values)
         self._curr.execute(sql)
         self._conn.commit()
 
-    def fetch_one(self, query: str, default_value = 0):
+    def fetch_one(self, query: str, default_value=0):
         self._curr.execute(query)
         result = self._curr.fetchone()
         return result[0] if result else default_value
@@ -71,14 +82,32 @@ class Database:
     def get_missing_records_count(self):
         pass
 
-    def get_missing_records(self, last_page = 1, per_page = 10):
+    def get_missing_records(self, last_page=1, per_page=10):
         pass
 
     def generate_unique_requests(self):
         pass
 
     def get_unique_requests(self):
-        return self.fetch_all('SELECT * from dp_unique_requests')
+        end = self.__get_end_timestamp()
+        start = self.__get_start_timestamp()
+        return self.fetch_all(
+            f'SELECT * from dp_unique_requests where dproc in (select distinct dproc from dp_requests where createdAt > {start} and createdAt < {end})')
 
-    def get_unique_requests_count(self, interval_hours = 24):
+    def __get_end_timestamp(self):
+        now = datetime.utcnow()
+        midnight = datetime.combine(now, datetime.min.time())
+        utc_time = midnight.replace(tzinfo=timezone.utc)
+        utc_timestamp = utc_time.timestamp()
+        return utc_timestamp
+
+    def __get_start_timestamp(self):
+        now = datetime.utcnow()
+        yesterday = now - timedelta(days=1)
+        midnight = datetime.combine(yesterday, datetime.min.time())
+        utc_time = midnight.replace(tzinfo=timezone.utc)
+        utc_timestamp = utc_time.timestamp()
+        return utc_timestamp
+
+    def get_unique_requests_count(self, interval_hours=24):
         pass

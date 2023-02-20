@@ -1,13 +1,14 @@
 import sqlite3, configparser
+
 try:
     from services.database import Singleton, Database, DB_TYPES, IS_NOT_LINUX
 except ImportError:
     from database import Singleton, Database, DB_TYPES
 
 
-class SqliteDatabase(Database, metaclass = Singleton):
+class SqliteDatabase(Database, metaclass=Singleton):
 
-    def connect(self, config = None):
+    def connect(self, config=None):
         super().connect(config=config)
         if not config:
             config = configparser.ConfigParser()
@@ -15,10 +16,10 @@ class SqliteDatabase(Database, metaclass = Singleton):
 
         self._conn = sqlite3.connect(config['SQLITE']['DB_DATABASE'], timeout=15)
         self._curr = self._conn.cursor()
-        
+
     def init(self, *args, **kwargs):
         Database.init(self, *args, **kwargs)
-        
+
         self._curr.execute('''create table if not exists dp_requests (
                 id bigint(20) primary key,
                 dpRequestId bigint(20) UNIQUE default 0,
@@ -56,11 +57,15 @@ class SqliteDatabase(Database, metaclass = Singleton):
         self._curr.execute('''CREATE INDEX if not exists dp_requests_dpRequestId_idx ON  dp_requests (dpRequestId);''')
         self._curr.execute('''CREATE INDEX if not exists dp_requests_createdAt_idx ON  dp_requests (createdAt);''')
 
-        self._curr.execute('''CREATE INDEX if not exists dp_unique_requests_dproc_idx ON  dp_unique_requests (dproc);''')
-        self._curr.execute('''CREATE INDEX if not exists dp_unique_requests_dpRequestId_idx ON  dp_unique_requests (dpRequestId);''')
-        self._curr.execute('''CREATE INDEX if not exists dp_unique_requests_createdAt_idx ON  dp_unique_requests (createdAt);''')
-        self._curr.execute('''CREATE INDEX if not exists dp_unique_requests_updated_at_idx ON  dp_unique_requests (updated_at);''')
-        
+        self._curr.execute(
+            '''CREATE INDEX if not exists dp_unique_requests_dproc_idx ON  dp_unique_requests (dproc);''')
+        self._curr.execute(
+            '''CREATE INDEX if not exists dp_unique_requests_dpRequestId_idx ON  dp_unique_requests (dpRequestId);''')
+        self._curr.execute(
+            '''CREATE INDEX if not exists dp_unique_requests_createdAt_idx ON  dp_unique_requests (createdAt);''')
+        self._curr.execute(
+            '''CREATE INDEX if not exists dp_unique_requests_updated_at_idx ON  dp_unique_requests (updated_at);''')
+
         self._conn.commit()
 
     def get_missing_records_count(self):
@@ -73,7 +78,7 @@ class SqliteDatabase(Database, metaclass = Singleton):
         result = self._curr.fetchone()
         return result[0] if result else 0
 
-    def get_missing_records(self, last_page = 1, per_page = 10):
+    def get_missing_records(self, last_page=1, per_page=10):
         _max = self.get_last_dp_request(field='id')
         if _max == None:
             _max = 0
@@ -82,7 +87,7 @@ class SqliteDatabase(Database, metaclass = Singleton):
         fount_items = 0
         current_iter = last_page + 2 if last_page > 1 else last_page
         while current_iter < _max and fount_items < per_page:
-            inline_query = self.__get_dp_request_by_id(_id = current_iter)
+            inline_query = self.__get_dp_request_by_id(_id=current_iter)
             if not inline_query:
                 _str += f'{current_iter - 1},'
                 fount_items += 1
@@ -102,5 +107,5 @@ class SqliteDatabase(Database, metaclass = Singleton):
     def get_unique_requests_count(self):
         super().get_count_of_dp_requests()
 
-        query = f'''select count(distinct dproc) from dp_requests where date(createdAt, 'unixepoch', '-1 day') = date('now', '-1 day') '''
+        query = 'select count(distinct dproc) from dp_unique_requests'
         return self.fetch_one(query)
