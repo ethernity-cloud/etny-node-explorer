@@ -1,0 +1,51 @@
+
+-- depricated: due to a significant delay in execution time
+
+drop trigger if exists dp_unique_request_trigger;
+create trigger if not exists dp_unique_request_trigger
+    before insert on dp_requests
+    for each row
+        begin
+            insert into dp_unique_requests (
+                id,
+                dpRequestId,
+                dproc,
+                cpuRequest,
+                memoryRequest,
+                storageRequest,
+                bandwidthRequest,
+                duration,
+                minPrice,
+                `status`,
+                createdAt,
+                local_created_at,
+                updated_at
+            ) values (
+                new.id,
+                new.dpRequestId,
+                new.dproc,
+                new.cpuRequest,
+                new.memoryRequest,
+                new.storageRequest,
+                new.bandwidthRequest,
+                new.duration,
+                new.minPrice,
+                new.status,
+                new.createdAt,
+                new.local_created_at,
+                unix_timestamp()
+            ) ON DUPLICATE KEY UPDATE
+                id = values(id),
+                dpRequestId = values(dpRequestId),
+                cpuRequest = values(cpuRequest),
+                memoryRequest = values(memoryRequest),
+                storageRequest = values(storageRequest),
+                bandwidthRequest = values(bandwidthRequest),
+                duration = values(duration),
+                minPrice = values(minPrice),
+                `status` = values(`status`),
+                createdAt = values(createdAt),
+                local_created_at = values(local_created_at),
+                updated_at = values(updated_at),
+                nodes_count = nodes_count + 1;
+        end;

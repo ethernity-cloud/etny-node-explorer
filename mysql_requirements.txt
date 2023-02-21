@@ -1,0 +1,4 @@
+web3==5.31.3
+packaging==20.3
+PyMySQL==1.0.2
+cryptography==39.0.1

@@ -11,13 +11,25 @@ Below commands are installing the prerequsites and clone the repository
 ```
 sudo apt update
 sudo apt upgrade -y
-sudo apt install python3 python3-pip python3-packaging -y
-pip3 install web3
+sudo apt install python3 python3-pip
+
+# for mysql version
+pip3 install -r mysql_requirements.txt
+
+# for sqlite version
+pip3 install -r sqlite_requirements.txt
+
 git clone https://github.com/ethernity-cloud/etny-node-explorer
 ```
 
+## Stored Database
+There are two methods for storing data: mysql and sqlite. The method used can be controlled through the "config.ini" file.<br/>
+
+P.S <br />
+ to use mysql version please install mysql server locally and run "sudo ./create_mysql_database.sh"
+
 ### Running
-Launch the script with ```python3 nodes_reader.py```  <br />
+Launch the script with ```python3 main.py```  <br />
 The script works by scanning the blockchain for nodes which interacts with the smart contract and saves the output to a CSV file. <br />
 When ran for the first time the script creates an local index by scanning the blockchain. This takes a *long* time, usually about 5 hours.  <br />
 Subsequent runs will run much faster by looking at the differences.
@@ -32,11 +44,7 @@ IndexFile = data.json
 CSVFile = nodes.csv
 ```
 
-*data.json* - Data dictionary with request ids and data processing request containing block number <br />
-
-*nodes.csv* - Output of the script with the details of the nodes interacting with the smart contract <br />
-
-*nodes.csv* - Column details <br />
+Generated *.csv file`s - Column details <br />
 
 | Column 01  | Column 02 | Column 03 | Column 04 | Column 05 | Column 06 | Column 07 | Column 08 | Column 09 | Column 10 |Column 11|
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |

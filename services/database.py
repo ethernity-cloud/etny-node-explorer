@@ -1,144 +1,113 @@
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+import os, sys
 
-import time
+IS_NOT_LINUX = sys.platform.startswith('win') or 'windows_nt' in os.environ.get('OS',
+                                                                                '').lower() or 'darwin' in os.environ.get(
+    'OS', '').lower() or sys.platform.startswith('darwin')
+DB_TYPES = Enum('DB_TYPES', ['MYSQL', 'SQLITE'])
 
- 
-class dbException(Exception):
-    pass
+
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
 
 class Database:
-    TABLE_NAME = 'orders'
-    _conn, _curr, logger = None, None, None
-    queryLogIsEnabled = False
+    _conn, _curr = None, None
+    ENGINE = ''
 
-    dict_cursor = False
-    def __init__(self, dict_cursor = False, config = None, logger = None) -> None:
-        self.dict_cursor = dict_cursor
-        self.logger = logger
+    def __init__(self, config=None) -> None:
         self.connect(config=config)
 
-    def reConnect(self, config = None) -> None:
-        pass
-
-    def connect(self, config = None) -> None:
-        try:
-            self.queryLogIsEnabled = config['DATABASE']['queryLogIsEnabled'] in ['True', '1']
-        except (ValueError, TypeError) as e:
-            pass
-
     def init(self) -> None:
+        print('init ', self.ENGINE)
+
+    def connect(self, config=None):
         pass
 
     def commit(self) -> None:
         self._conn.commit()
 
-    def dropTable(self):
-        try:
-            self._curr.execute("set foreign_key_checks = 0;")
-        except:pass
-        self._curr.execute(f"drop table if exists {self.TABLE_NAME}")
-        self._curr.execute(f"drop table if exists {self.TABLE_NAME}_details")
-
-
-    def insert(self, node = None) -> None:
-        pass
-
-    def update(self, node):
-        public = node.public()
-        private = node.private()
-        query = f'''update {self.TABLE_NAME} set  {self.extract_args({x: y for x, y in private.items() if x not in ['id']})}, updates_count = updates_count + 1 where id = {node.id}'''
-        if self.queryLogIsEnabled:
-            print(query)
-        sub_query = f'''update {self.TABLE_NAME}_details set 
-                            {self.extract_args({**public})}, update_date = {int(time.time())}
-                        where parent_id = {node.id}'''
-        self._curr.execute(query)
-        self._curr.execute(sub_query)
-        return self    
-
-    def __getattr__(self, methodName):
-        def wrapper(*args, **kwargs):
-            if methodName in ['select_one', 'select_all', 'count']:
-                is_single = 'single' in kwargs.keys()
-                if is_single:
-                    fields = kwargs['single']
-                else:
-                    fields = "count(*)" if methodName == 'count' else "*"
-
-                query = f'''select {fields} from {self.TABLE_NAME}'''
-                if [key for key in kwargs.keys() if key not in ['single']]:
-                    arguments = [f"{x} = {y}" for x, y in kwargs.items() if x not in ['single']]
-                    query += f''' where {(" and ".join(arguments))}'''
-
-                # print(query)
-                self._curr.execute(query)
-                if methodName in ['select_all']:             
-                    result = self._curr.fetchall()
-                    if is_single:
-                        return (x[0] for x in result) # generator
-                    return (x for x in result) # generator
-                result = self._curr.fetchone()
-                return [] if not result else (result[0] if is_single and result and ',' not in kwargs['single'] else [x for x in result if x])
-        return wrapper
-
-
-    def raw_select(self, query):
-        self._curr.execute(query)
-        result = self._curr.fetchall()
-        return (x for x in result) # generator
-
-    def number_of_missing_items(self):
-        query = f'''
-            select 
-                count(d.id)
-            from {self.TABLE_NAME} d 
-            where id > -1 and not exists (select id from {self.TABLE_NAME} where id = d.id + 1) and d.id < (select max(id) from {self.TABLE_NAME});
-        '''
-        query = self._curr.execute(query)
-        return self._curr.fetchone()
-
-
-    def select_all(self, limit = 1000):
-        query = f'''
-            select 
-                o1.id,
-                o1.block_identifier,
-                d.address,
-                d.cpu,
-                d.memory,
-                d.storage,
-                d.bandwith,
-                d.duration,
-                d.status,
-                d.cost,
-                o1.created_on,
-                -- (select created_on from {self.TABLE_NAME} where id = d.parent_id order by (case when last_updated then last_updated else created_on end) desc) as last_updated,
-                -- max(d.insert_date) as last_updated,
-                max((case when o1.last_updated then o1.last_updated else o1.created_on end)) as last_updated,
-                count(o2.address) as updates_count
-            from {self.TABLE_NAME}_details d 
-            join (select * from {self.TABLE_NAME} order by created_on asc) o1 on o1.id = d.parent_id
-            join (select * from {self.TABLE_NAME}_details order by id desc) o2 on o2.parent_id = d.parent_id
-            group by d.address order by d.id;
-        '''
-
-        if limit: query += f" limit {limit}"
-        return query
-
-
-    def count_of_left_nodes(self):
-        self._curr.execute(f'''
-            select 
-                count(d.id) as id
-            from orders d 
-            where id > -1 and not exists (select id from orders where id = d.id + 1) and d.id < (select max(id) from orders);
-        ''')
-        return self._curr.fetchone()
-
-    def extract_args(self, items):
-        return ",".join([f"{x} = {y}" if type(y) != str else f"{x} = '{y}'" for x, y in items.items()])
-
     def __del__(self):
         try:
             self._curr.close()
             self._conn.close()
-        except:pass
+        except:  # pylint: disable=bare-except
+            pass
+
+    # - shared methods
+
+    def get_last_dp_request(self, field='dpRequestId'):
+        self._curr.execute(f'SELECT max({field}) FROM dp_requests')
+        return self._curr.fetchone()[0]
+
+    def get_count_of_dp_requests(self):
+        self._curr.execute('SELECT count(dpRequestId) FROM dp_requests')
+        return self._curr.fetchone()[0]
+
+    def get_min_dp_request_id(self):
+        self._curr.execute('SELECT min(dpRequestId) FROM dp_requests')
+        return self._curr.fetchone()[0]
+
+    def store_dp_requests(self, models):
+        keys = models[0].keys
+        sql = "INSERT "
+        if self.ENGINE == DB_TYPES.SQLITE:
+            sql += "or "
+        sql += f'''ignore into dp_requests ({",".join(keys)}) values '''
+        values = []
+        for model in models:
+            items = model.items
+            v = [f"'{items[x]}'" if type(items[x]) == str else str(items[x]) for x in
+                 keys]  # pylint: disable=unidiomatic-typecheck, invalid-name
+            values.append(f'''( {",".join(v)}  )''')
+        sql += ",".join(values)
+        self._curr.execute(sql)
+        self._conn.commit()
+
+    def fetch_one(self, query: str, default_value=0):
+        self._curr.execute(query)
+        result = self._curr.fetchone()
+        return result[0] if result else default_value
+
+    def fetch_all(self, query: str):
+        self._curr.execute(query)
+        return self._curr.fetchall()
+
+    def get_missing_records_count(self):
+        pass
+
+    def get_missing_records(self, last_page=1, per_page=10):
+        pass
+
+    def generate_unique_requests(self):
+        pass
+
+    def get_unique_requests(self):
+        end = self.__get_end_timestamp()
+        start = self.__get_start_timestamp()
+        return self.fetch_all(
+            f'SELECT * from dp_unique_requests where dproc in (select distinct dproc from dp_requests where createdAt > {start} and createdAt < {end})')
+
+    def __get_end_timestamp(self):
+        now = datetime.utcnow()
+        midnight = datetime.combine(now, datetime.min.time())
+        utc_time = midnight.replace(tzinfo=timezone.utc)
+        utc_timestamp = utc_time.timestamp()
+        return utc_timestamp
+
+    def __get_start_timestamp(self):
+        now = datetime.utcnow()
+        yesterday = now - timedelta(days=1)
+        midnight = datetime.combine(yesterday, datetime.min.time())
+        utc_time = midnight.replace(tzinfo=timezone.utc)
+        utc_timestamp = utc_time.timestamp()
+        return utc_timestamp
+
+    def get_unique_requests_count(self, interval_hours=24):
+        pass
